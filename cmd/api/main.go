@@ -26,11 +26,12 @@ func main() {
 	config.LoadConfig()
 
 	database.Connect()
-	//database.RunMigrations()
+	// database.RunMigrations()
+
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     "162.243.161.156:6379",
+		Addr:     "127.0.0.1:6379",
 		Password: "nico1234.",
-		DB:       0, // use default DB
+		DB:       0,
 		Protocol: 2,
 	})
 
@@ -40,49 +41,44 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	openiaService := openiaService.NewOpenIaService(rdb)
+	openiaSvc := openiaService.NewOpenIaService(rdb)
 
 	router := gin.Default()
 	router.Use(middleware.CORS())
+
+	// Confiar solo en Nginx/local
+	err := router.SetTrustedProxies([]string{"127.0.0.1", "::1"})
+	if err != nil {
+		log.Fatal("Failed to set trusted proxies:", err)
+	}
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong", "status": "healthy"})
 	})
 
-	// Serve uploaded files (photos, PDFs, resources)
 	router.Static("/storage", "./storage")
 
 	api := router.Group("/api/v1")
 	authMiddleware := auth.GetAuthMiddleware()
 
-	// Auth (públicas + protegidas)
 	auth.RegisterRoutes(api)
-
-	// Admin: clínicas, sucursales, consultorios, profesiones, planes
 	admin.RegisterRoutes(api, authMiddleware)
-
-	// Pacientes
 	pacientes.RegisterRoutes(api, authMiddleware)
-
-	// Agenda: citas, sesiones, horarios, bloqueos
 	agenda.RegisterRoutes(api, authMiddleware)
-
-	// Cobros y pagos
 	cobros.RegisterRoutes(api, authMiddleware)
-
-	// Especialidades
 	psicologia.RegisterRoutes(api, authMiddleware)
-	nutricion.RegisterRoutes(api, authMiddleware, rdb, openiaService)
+	nutricion.RegisterRoutes(api, authMiddleware, rdb, openiaSvc)
 	odontologia.RegisterRoutes(api, authMiddleware)
-
-	// Historia clínica, formularios, tests
 	historia.RegisterRoutes(api, authMiddleware)
 	tests.RegisterRoutes(api, authMiddleware)
 
 	port := config.AppConfig.ServerPort
-	log.Printf("Server starting on port %s", port)
+	addr := "127.0.0.1:" + port
+
+	log.Printf("Server starting on %s", addr)
 	log.Printf("Environment: %s", config.AppConfig.Environment)
-	if err := router.Run(":" + port); err != nil {
+
+	if err := router.Run(addr); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
 }
