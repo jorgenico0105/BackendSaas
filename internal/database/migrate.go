@@ -4,9 +4,9 @@ import (
 	"log"
 
 	//adminModels "saas-medico/internal/modules/admin/models"
-	agendaModels "saas-medico/internal/modules/agenda/models"
-	//historiaModels "saas-medico/internal/modules/historia/models"
-	// nutricionModels "saas-medico/internal/modules/nutricion/models"
+	//agendaModels "saas-medico/internal/modules/agenda/models"
+	historiaModels "saas-medico/internal/modules/historia/models"
+	nutricionModels "saas-medico/internal/modules/nutricion/models"
 	// pacientesModels "saas-medico/internal/modules/pacientes/models"
 )
 
@@ -64,16 +64,16 @@ func RunMigrations() {
 	// }
 
 	// 4. Agenda: tipos, estados, citas, sesiones, horarios, bloqueos
-	if err := db.AutoMigrate(
-		&agendaModels.TipoCita{},
-		// &agendaModels.EstadoCita{},
-		// &agendaModels.Cita{},
-		// &agendaModels.Sesion{},
-		// &agendaModels.HorarioMedico{},
-		// &agendaModels.BloqueoAgenda{},
-	); err != nil {
-		log.Fatal("Migration failed (agenda):", err)
-	}
+	//if err := db.AutoMigrate(
+	//&agendaModels.TipoCita{},
+	// &agendaModels.EstadoCita{},
+	// &agendaModels.Cita{},
+	// &agendaModels.Sesion{},
+	// &agendaModels.HorarioMedico{},
+	// &agendaModels.BloqueoAgenda{},
+	// ); err != nil {
+	// 	log.Fatal("Migration failed (agenda):", err)
+	// }
 
 	// 5. Cobros
 	// if err := db.AutoMigrate(
@@ -88,19 +88,19 @@ func RunMigrations() {
 	// }
 
 	// 6. Historia clínica — catálogos y formularios dinámicos
-	//if err := db.AutoMigrate(
-	// &historiaModels.TipoFormulario{},
-	// &historiaModels.AlergiaCatalogo{},
-	// &historiaModels.TipoAntecedente{},
-	// &historiaModels.HabitoCatalogo{},
-	// &historiaModels.DiagnosticoCatalogo{},
-	// &historiaModels.TipoExamen{},
-	//&historiaModels.Formulario{},
-	// &historiaModels.FormularioPregunta{},
-	// &historiaModels.FormularioOpcion{},
-	// ); err != nil {
-	// 	log.Fatal("Migration failed (historia - catalogos/formularios):", err)
-	// }
+	if err := db.AutoMigrate(
+		&historiaModels.TipoFormulario{},
+		// &historiaModels.AlergiaCatalogo{},
+		// &historiaModels.TipoAntecedente{},
+		// &historiaModels.HabitoCatalogo{},
+		// &historiaModels.DiagnosticoCatalogo{},
+		// &historiaModels.TipoExamen{},
+		//&historiaModels.Formulario{},
+		// &historiaModels.FormularioPregunta{},
+		// &historiaModels.FormularioOpcion{},
+	); err != nil {
+		log.Fatal("Migration failed (historia - catalogos/formularios):", err)
+	}
 
 	// 7. Historia clínica — registros del paciente
 	// if err := db.AutoMigrate(
@@ -130,20 +130,21 @@ func RunMigrations() {
 	// }
 
 	// 9. Nutrición — catálogos (sin FK a otras tablas)
-	// if err := db.AutoMigrate(
-	// 	&nutricionModels.NutricionTipoComida{},
-	// 	&nutricionModels.NutricionGrupoAlimento{}, // debe ir antes de NutricionAlimento (FK)
-	//&nutricionModels.NutricionAlimento{},
-	//&nutricionModels.NutricionTipoComidaGrupo{},
-	//&nutricionModels.NutricionTipoRecurso{},
-	//&nutricionModels.NutricionArchivoPDF{},
-	//&nutricionModels.NutricionRegistroAlimento{},
-	// 	&nutricionModels.NutricionDietaCatalogo{},
-	// 	&nutricionModels.NutricionEjercicioCatalogo{},
-	// 	&nutricionModels.NutricionLogroCatalogo{},
-	// ); err != nil {
-	// 	log.Fatal("Migration failed (nutricion - catalogos):", err)
-	// }
+	if err := db.AutoMigrate(
+		&nutricionModels.NutricionMenuPlantilla{},
+		// 	&nutricionModels.NutricionTipoComida{},
+		// 	&nutricionModels.NutricionGrupoAlimento{}, // debe ir antes de NutricionAlimento (FK)
+		//&nutricionModels.NutricionAlimento{},
+		//&nutricionModels.NutricionTipoComidaGrupo{},
+		//&nutricionModels.NutricionTipoRecurso{},
+		//&nutricionModels.NutricionArchivoPDF{},
+		//&nutricionModels.NutricionRegistroAlimento{},
+		// 	&nutricionModels.NutricionDietaCatalogo{},
+		// 	&nutricionModels.NutricionEjercicioCatalogo{},
+		// 	&nutricionModels.NutricionLogroCatalogo{},
+	); err != nil {
+		log.Fatal("Migration failed (nutricion - catalogos):", err)
+	}
 
 	// 10. Nutrición — plan de dieta, menús y detalles de menú (requiere pacientes)
 	// Jerarquía: DietaPaciente → Menu (semana) → MenuDetalle (día+comida) → MenuAlimento

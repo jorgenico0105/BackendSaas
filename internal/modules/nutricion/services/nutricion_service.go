@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"log"
 	"math"
@@ -28,6 +29,11 @@ type NutricionService struct {
 
 func NewNutricionService(repo *repositories.NutricionRepository, redis *redis.Client) *NutricionService {
 	return &NutricionService{repo: repo, redis: redis}
+}
+
+// Desactivar menus
+func (s *NutricionService) DeactivateOldMenus(ctx context.Context) {
+	s.repo.DesactivarMenusAnitguos()
 }
 
 // ─── Alimentos ────────────────────────────────────────────────────────────────
@@ -69,6 +75,36 @@ func (s *NutricionService) CreateAlimento(req models.CreateAlimentoRequest, crea
 		CreadoPor:      &creadoPor,
 	}
 	if err := s.repo.CreateAlimento(a); err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+func (s *NutricionService) UpdateAlimento(id uint, req models.UpdateAlimentoRequest) (*models.NutricionAlimento, error) {
+	a, err := s.repo.FindAlimentoByID(id)
+	if err != nil {
+		return nil, err
+	}
+	porcion := req.GramosPorcion
+	if porcion == 0 {
+		porcion = 100
+	}
+	a.Nombre = req.Nombre
+	a.Descripcion = req.Descripcion
+	a.Categoria = req.Categoria
+	a.GramosPorcion = porcion
+	a.Calorias = req.Calorias
+	a.ProteínasG = req.ProteínasG
+	a.CarbohidratosG = req.CarbohidratosG
+	a.GrasasG = req.GrasasG
+	a.FibraG = req.FibraG
+	a.AzucaresG = req.AzucaresG
+	a.SodioMg = req.SodioMg
+	a.Desayuno = req.Desayuno
+	a.MediaTardeMana = req.MediaTardeMana
+	a.Almuerzo = req.Almuerzo
+	a.Merienda = req.Merienda
+	if err := s.repo.UpdateAlimento(a); err != nil {
 		return nil, err
 	}
 	return a, nil
@@ -119,7 +155,7 @@ func (s *NutricionService) CreateDieta(pacienteID, medicoID uint, req models.Cre
 		Nombre:              req.Nombre,
 		Descripcion:         req.Descripcion,
 		Objetivo:            req.Objetivo,
-		ResultadoEsperado:   req.ResultadoEsperado,
+		PesoObjetivo:        req.ResultadoEsperado,
 		FechaInicio:         fechaInicio,
 		DuracionDias:        duracion,
 		FechaFin:            &fechaFin,
@@ -154,8 +190,8 @@ func (s *NutricionService) UpdateDieta(id uint, req models.UpdateDietaRequest) (
 	if req.Objetivo != "" {
 		d.Objetivo = req.Objetivo
 	}
-	if req.ResultadoEsperado != "" {
-		d.ResultadoEsperado = req.ResultadoEsperado
+	if req.ResultadoEsperado != nil {
+		d.PesoObjetivo = req.ResultadoEsperado
 	}
 	if req.Estado != "" {
 		d.Estado = req.Estado
@@ -184,15 +220,119 @@ func (s *NutricionService) UpdateDieta(id uint, req models.UpdateDietaRequest) (
 
 // ─── Menús ────────────────────────────────────────────────────────────────────
 func (s *NutricionService) CreateMenu(dietaID, pacienteID uint, req models.CreateMenuRequest) (*models.NutricionMenu, error) {
-
-	var userAlimento []models.NutricionAlimento
-	done := make(chan struct{})
-
 	fechaInicio, err := time.ParseInLocation("2006-01-02", req.FechaInicio, time.Local)
 	if err != nil {
 		fechaInicio = time.Now()
 	}
 	fechaFin := fechaInicio.AddDate(0, 0, 6)
+	mpa, err := s.repo.GetMenuPlantilla(dietaID)
+	if err != nil {
+		return nil, err
+	}
+	if mpa.MenuID != 0 {
+		menu, err := s.repo.FindMenuByID(mpa.MenuID)
+		if err != nil {
+			return nil, err
+		}
+
+		menuToSave := &models.NutricionMenu{
+			DietaPacienteID: dietaID,
+			SemanaNumero:    req.SemanaNumero,
+			Nombre:          req.Nombre,
+			Notas:           req.Notas,
+			FechaInicio:     fechaInicio,
+			FechaFin:        fechaFin,
+			Estado:          "ACTIVO",
+			State:           "A",
+		}
+
+		err = s.repo.CreateMenu(menuToSave)
+		if err != nil {
+			return nil, err
+		}
+		type detallePair struct {
+			original models.NutricionMenuDetalle
+			nuevo    *models.NutricionMenuDetalle
+		}
+
+		var pares []detallePair
+		var detallesNuevos []*models.NutricionMenuDetalle
+
+		for i := range menu.Detalles {
+			src := menu.Detalles[i]
+
+			nuevoDetalle := &models.NutricionMenuDetalle{
+				MenuID:              menuToSave.ID,
+				TipoComidaID:        src.TipoComidaID,
+				DiaNúmero:           src.DiaNúmero,
+				NombreComida:        src.NombreComida,
+				Instrucciones:       src.Instrucciones,
+				CaloriasTotal:       src.CaloriasTotal,
+				ProteinasGTotal:     src.ProteinasGTotal,
+				CarbohidratosGTotal: src.CarbohidratosGTotal,
+				GrasasGTotal:        src.GrasasGTotal,
+				State:               src.State,
+			}
+
+			detallesNuevos = append(detallesNuevos, nuevoDetalle)
+			pares = append(pares, detallePair{
+				original: src,
+				nuevo:    nuevoDetalle,
+			})
+		}
+
+		foods, err := s.repo.CreateMenuDetalles(detallesNuevos)
+		if err != nil {
+			log.Println(err)
+			return nil, err
+		}
+
+		if len(foods) != len(pares) {
+			return nil, errors.New("no coincide la cantidad de detalles creados con la plantilla")
+		}
+
+		for i := range foods {
+			pares[i].nuevo.ID = foods[i].ID
+		}
+
+		var alimentos []*models.NutricionMenuAlimento
+
+		for _, par := range pares {
+			for j := range par.original.Alimentos {
+				srcAl := par.original.Alimentos[j]
+
+				nuevoAlimento := &models.NutricionMenuAlimento{
+					MenuDetalleID:      par.nuevo.ID,
+					AlimentoID:         srcAl.AlimentoID,
+					GramosAsignados:    srcAl.GramosAsignados,
+					CaloriasCalc:       srcAl.CaloriasCalc,
+					ProteinasGCalc:     srcAl.ProteinasGCalc,
+					CarbohidratosGCalc: srcAl.CarbohidratosGCalc,
+					GrasasGCalc:        srcAl.GrasasGCalc,
+					Observacion:        srcAl.Observacion,
+					State:              srcAl.State,
+				}
+
+				alimentos = append(alimentos, nuevoAlimento)
+			}
+		}
+
+		if len(alimentos) > 0 {
+			_, err = s.repo.AddAlimentosToComidas(alimentos)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		err = s.repo.UpdateMenuPlantilla(mpa.DietaPacienteID, menuToSave.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		return menuToSave, nil
+	}
+	var userAlimento []models.NutricionAlimento
+	done := make(chan struct{})
 
 	m := &models.NutricionMenu{
 		DietaPacienteID: dietaID,
@@ -201,14 +341,20 @@ func (s *NutricionService) CreateMenu(dietaID, pacienteID uint, req models.Creat
 		Notas:           req.Notas,
 		FechaInicio:     fechaInicio,
 		FechaFin:        fechaFin,
-		Estado:          "PENDIENTE",
+		Estado:          "ACTIVO",
 		State:           "A",
 	}
 
 	if err := s.repo.CreateMenu(m); err != nil {
 		return nil, err
 	}
-
+	mp := &models.NutricionMenuPlantilla{
+		MenuID:          m.ID,
+		DietaPacienteID: dietaID,
+	}
+	if err := s.repo.CreateMenuPlantilla(mp); err != nil {
+		return nil, err
+	}
 	var (
 		preferences []models.NutricionPreferenciaAlimento
 		alimentos   []models.NutricionAlimento
@@ -316,9 +462,9 @@ func (s *NutricionService) GenerateMenuFoods(
 	}
 
 	caloriasDieta := *dieta.CaloriasDiaObjetivo
-	proteinasDieta := *dieta.ProteínasGDia
-	carbosGDia := *dieta.CarbohidratosGDia
-	grasasGDia := *dieta.GrasasGDia
+	proteinasDieta := clampMacro(*dieta.ProteínasGDia, gramosProteMin, gramosProteMax)
+	carbosGDia := clampMacro(*dieta.CarbohidratosGDia, gramosCarbMin, gramosCarbMax)
+	grasasGDia := clampMacro(*dieta.GrasasGDia, gramosGrasaMin, gramosGrasaMax)
 
 	// porcentaje por tipo_comida_id
 	foodsMap := make(map[uint]float64)
@@ -394,6 +540,7 @@ type AlimentosPorMomento struct {
 type AlimentoConGramos struct {
 	Alimento *models.NutricionAlimento
 	Gramos   float64
+	Tipo     string // "P", "C", "G", "F"
 }
 
 func (s *NutricionService) addAlimentosToComida(
@@ -488,15 +635,14 @@ func (s *NutricionService) addAlimentosToComida(
 			}
 		}
 	}
-	factorToleranciaGramos := 5.5
+	factorToleranciaGramos := 1.5
 	//var alimentosConGramos []AlimentoConGramos
 	//alimentoConGramos := make(map[uint]AlimentoConGramos)
 	for _, food := range foods {
-		objCalorias := 0.0
 		objProteinas := 0.0
 		objGrasas := 0.0
 		objCarbos := 0.0
-
+		objCalorias := 0.0
 		if food.CaloriasTotal != nil {
 			objCalorias = *food.CaloriasTotal
 		}
@@ -511,7 +657,9 @@ func (s *NutricionService) addAlimentosToComida(
 		}
 
 		alimentos := alimentoMenuDetalle[int(food.ID)]
-
+		//log.Println("[Detalle por comida]", food.ID, objProteinas, objCarbos, objGrasas)
+		// Las calorías se derivan de los macros (P*4 + C*4 + G*9); pasar 0 omite
+		// la fase de ajuste calórico que sobreescribía los macros ya convergidos.
 		itemsConGramos := calcularGramosPorAlimento(
 			alimentos,
 			objProteinas,
@@ -553,11 +701,36 @@ func randomAlimento(alimentos []*models.NutricionAlimento) *models.NutricionAlim
 }
 
 const (
-	gramosPorcionRef   = 100.0
-	gramosMinimoBase   = 20.0
-	gramosMaximoBase   = 300.0
-	maxIteraciones     = 70
-	toleranciaCalorias = 30.0 // ±30 kcal de tolerancia para el objetivo calórico por comida
+	gramosPorcionRef = 100.0
+	maxIteraciones   = 40
+
+	// tolerancias por comida
+	toleranciaProte = 4.0
+	toleranciaCarb  = 6.0
+	toleranciaGrasa = 2.0
+
+	toleranciaCalorias = 25.0 // ±25 kcal por comida
+
+	// rangos por tipo de alimento
+	proteMin = 80.0
+	proteMax = 220.0
+
+	carbMin = 60.0
+	carbMax = 260.0
+
+	grasaMin = 5.0
+	grasaMax = 30.0
+
+	fibraMin = 30.0
+	fibraMax = 300.0
+
+	// límites diarios que ya usas al crear objetivos
+	gramosProteMin = 80.0
+	gramosProteMax = 200.0
+	gramosCarbMin  = 100.0
+	gramosCarbMax  = 300.0
+	gramosGrasaMin = 5.0
+	gramosGrasaMax = 30.0
 )
 
 func macrosDeAlimento(a *models.NutricionAlimento, gramos float64) (proteinas, carbos, grasas, calorias float64) {
@@ -580,155 +753,233 @@ func calcularGramosPorAlimento(
 	alimentos []*models.NutricionAlimento,
 	objProteinas, objCarbos, objGrasas float64,
 	objCalorias float64,
-	tolerancia float64,
+	_ float64, // se ignora la tolerancia vieja para no romper la firma
 ) []AlimentoConGramos {
-	n := len(alimentos)
-	if n == 0 {
+	if len(alimentos) == 0 {
 		return nil
 	}
 
-	resultado := make([]AlimentoConGramos, n)
-	for i, a := range alimentos {
-		resultado[i] = AlimentoConGramos{
+	resultado := make([]AlimentoConGramos, 0, len(alimentos))
+
+	// 1) asignación inicial por tipo real del alimento
+	for _, a := range alimentos {
+		tipo := detectarTipoAlimento(a)
+		gramos := gramosInicialesPorTipo(a, objProteinas, objCarbos, objGrasas)
+
+		resultado = append(resultado, AlimentoConGramos{
 			Alimento: a,
-			Gramos:   clampGramos(estimarGramosBase(a, objProteinas, objCarbos, objGrasas, n)),
-		}
+			Gramos:   gramos,
+			Tipo:     tipo,
+		})
 	}
 
+	// 2) ajuste iterativo por macro, respetando el tipo de alimento
 	for iter := 0; iter < maxIteraciones; iter++ {
-		totalP, totalC, totalG, _ := sumarMacros(resultado)
+		totalP, totalC, totalG, totalCal := sumarMacros(resultado)
 
-		diffP := totalP - objProteinas
-		diffC := totalC - objCarbos
-		diffG := totalG - objGrasas
+		diffP := objProteinas - totalP
+		diffC := objCarbos - totalC
+		diffG := objGrasas - totalG
+		diffCal := objCalorias - totalCal
 
-		if math.Abs(diffP) <= tolerancia && math.Abs(diffC) <= tolerancia && math.Abs(diffG) <= tolerancia {
+		okP := math.Abs(diffP) <= toleranciaProte
+		okC := math.Abs(diffC) <= toleranciaCarb
+		okG := math.Abs(diffG) <= toleranciaGrasa
+		okCal := objCalorias <= 0 || math.Abs(diffCal) <= toleranciaCalorias
+
+		if okP && okC && okG && okCal {
 			break
 		}
 
-		// Elegir el macro con mayor desviación
-		type macro struct {
-			diff   float64
-			aporte func(*models.NutricionAlimento) float64
-		}
-		macros := []macro{
-			{diffP, func(a *models.NutricionAlimento) float64 { return a.ProteínasG }},
-			{diffC, func(a *models.NutricionAlimento) float64 { return a.CarbohidratosG }},
-			{diffG, func(a *models.NutricionAlimento) float64 { return a.GrasasG }},
+		if !okP {
+			ajustarPorTipo(&resultado, "P", diffP, func(a *models.NutricionAlimento) float64 {
+				return a.ProteínasG
+			})
 		}
 
-		bestMacroIdx := -1
-		bestAbs := tolerancia
-		for i, m := range macros {
-			if a := math.Abs(m.diff); a > bestAbs {
-				bestAbs = a
-				bestMacroIdx = i
-			}
-		}
-		if bestMacroIdx < 0 {
-			break
+		if !okC {
+			ajustarPorTipo(&resultado, "C", diffC, func(a *models.NutricionAlimento) float64 {
+				return a.CarbohidratosG
+			})
 		}
 
-		diff := macros[bestMacroIdx].diff
-		aporteFn := macros[bestMacroIdx].aporte
-
-		bestItemIdx := -1
-		bestAporte := -1.0
-		for i, item := range resultado {
-			ap := aporteFn(item.Alimento) * (item.Gramos / gramosPorcionRef)
-			if ap > bestAporte {
-				bestAporte = ap
-				bestItemIdx = i
-			}
-		}
-		if bestItemIdx < 0 {
-			break
+		if !okG {
+			ajustarPorTipo(&resultado, "G", diffG, func(a *models.NutricionAlimento) float64 {
+				return a.GrasasG
+			})
 		}
 
-		aportePor100g := aporteFn(resultado[bestItemIdx].Alimento)
-		if aportePor100g <= 0 {
-			break
-		}
-
-		delta := (math.Abs(diff) / aportePor100g) * gramosPorcionRef
-		if diff > tolerancia {
-			resultado[bestItemIdx].Gramos = clampGramos(resultado[bestItemIdx].Gramos - delta)
-		} else {
-			resultado[bestItemIdx].Gramos = clampGramos(resultado[bestItemIdx].Gramos + delta)
-		}
-	}
-
-	// Segundo pase: ajuste calórico independiente (±30 kcal).
-	// 1g proteína = 4 kcal · 1g carbos = 4 kcal · 1g grasa = 9 kcal
-	// Se usa el campo Calorias del alimento (ya calculado por 100g) para ajustar
-	// el ítem con mayor aporte calórico hasta acercarse al objetivo.
-	if objCalorias > 0 {
-		for iter := 0; iter < maxIteraciones; iter++ {
-			_, _, _, totalCal := sumarMacros(resultado)
-			diffCal := totalCal - objCalorias
-			if math.Abs(diffCal) <= toleranciaCalorias {
-				break
-			}
-
-			bestItemIdx := -1
-			bestAporte := -1.0
-			for i, item := range resultado {
-				ap := item.Alimento.Calorias * (item.Gramos / gramosPorcionRef)
-				if ap > bestAporte {
-					bestAporte = ap
-					bestItemIdx = i
-				}
-			}
-			if bestItemIdx < 0 {
-				break
-			}
-
-			aportePor100g := resultado[bestItemIdx].Alimento.Calorias
-			if aportePor100g <= 0 {
-				break
-			}
-
-			delta := (math.Abs(diffCal) / aportePor100g) * gramosPorcionRef
-			if diffCal > toleranciaCalorias {
-				resultado[bestItemIdx].Gramos = clampGramos(resultado[bestItemIdx].Gramos - delta)
-			} else {
-				resultado[bestItemIdx].Gramos = clampGramos(resultado[bestItemIdx].Gramos + delta)
-			}
+		if !okCal && objCalorias > 0 {
+			ajustarCalorias(&resultado, diffCal)
 		}
 	}
 
 	return resultado
 }
-
-func estimarGramosBase(a *models.NutricionAlimento, objP, objC, objG float64, n int) float64 {
-	nF := float64(n)
-	type cand struct{ obj, aporte float64 }
-	candidates := []cand{
-		{objP, a.ProteínasG},
-		{objC, a.CarbohidratosG},
-		{objG, a.GrasasG},
+func clampMacro(v, minVal, maxVal float64) float64 {
+	if v < minVal {
+		return minVal
 	}
-	mejorAporte, mejorObj := 0.0, 0.0
-	for _, c := range candidates {
-		if c.aporte > mejorAporte {
-			mejorAporte = c.aporte
-			mejorObj = c.obj
-		}
-	}
-	if mejorAporte <= 0 {
-		return gramosMinimoBase
-	}
-	return (mejorObj / nF) * (gramosPorcionRef / mejorAporte)
-}
-
-func clampGramos(v float64) float64 {
-	if v < gramosMinimoBase {
-		return gramosMinimoBase
-	}
-	if v > gramosMaximoBase {
-		return gramosMaximoBase
+	if v > maxVal {
+		return maxVal
 	}
 	return v
+}
+func detectarTipoAlimento(a *models.NutricionAlimento) string {
+	p := a.ProteínasG
+	c := a.CarbohidratosG
+	g := a.GrasasG
+
+	if g >= p && g >= c && g >= 8 {
+		return "G"
+	}
+
+	if p >= c && p >= g && p >= 8 {
+		return "P"
+	}
+
+	if c >= p && c >= g && c >= 8 {
+		return "C"
+	}
+
+	return "F"
+}
+
+func clampRango(v, minVal, maxVal float64) float64 {
+	if v < minVal {
+		return minVal
+	}
+	if v > maxVal {
+		return maxVal
+	}
+	return v
+}
+
+func clampGramosPorTipo(tipo string, gramos float64) float64 {
+	switch tipo {
+	case "P":
+		return clampRango(gramos, proteMin, proteMax)
+	case "C":
+		return clampRango(gramos, carbMin, carbMax)
+	case "G":
+		return clampRango(gramos, grasaMin, grasaMax)
+	default:
+		return clampRango(gramos, fibraMin, fibraMax)
+	}
+}
+
+func gramosInicialesPorTipo(a *models.NutricionAlimento, objP, objC, objG float64) float64 {
+	tipo := detectarTipoAlimento(a)
+
+	switch tipo {
+	case "P":
+		if a.ProteínasG <= 0 {
+			return proteMin
+		}
+		return clampGramosPorTipo(tipo, (objP/a.ProteínasG)*gramosPorcionRef)
+
+	case "C":
+		if a.CarbohidratosG <= 0 {
+			return carbMin
+		}
+		return clampGramosPorTipo(tipo, (objC/a.CarbohidratosG)*gramosPorcionRef)
+
+	case "G":
+		if a.GrasasG <= 0 {
+			return grasaMin
+		}
+		return clampGramosPorTipo(tipo, (objG/a.GrasasG)*gramosPorcionRef)
+
+	default:
+		// vegetales/frutas: porción moderada base
+		return clampGramosPorTipo(tipo, 80.0)
+	}
+}
+
+func ajustarPorTipo(
+	items *[]AlimentoConGramos,
+	tipo string,
+	diff float64,
+	aporteFn func(*models.NutricionAlimento) float64,
+) {
+	bestIdx := -1
+	bestAporte := -1.0
+
+	for i, item := range *items {
+		if item.Tipo != tipo {
+			continue
+		}
+
+		ap := aporteFn(item.Alimento)
+		if ap > bestAporte {
+			bestAporte = ap
+			bestIdx = i
+		}
+	}
+
+	if bestIdx < 0 || bestAporte <= 0 {
+		return
+	}
+
+	delta := (diff / bestAporte) * gramosPorcionRef
+	nuevo := (*items)[bestIdx].Gramos + delta
+	(*items)[bestIdx].Gramos = clampGramosPorTipo(tipo, nuevo)
+}
+
+func existeTipo(items []AlimentoConGramos, tipo string) bool {
+	for _, item := range items {
+		if item.Tipo == tipo {
+			return true
+		}
+	}
+	return false
+}
+
+func ajustarCalorias(items *[]AlimentoConGramos, diffCal float64) {
+	// primero intenta ajustar carbos
+	if existeTipo(*items, "C") {
+		bestIdx := -1
+		bestCal := -1.0
+
+		for i, item := range *items {
+			if item.Tipo != "C" {
+				continue
+			}
+			if item.Alimento.Calorias > bestCal {
+				bestCal = item.Alimento.Calorias
+				bestIdx = i
+			}
+		}
+
+		if bestIdx >= 0 && bestCal > 0 {
+			delta := (diffCal / bestCal) * gramosPorcionRef
+			nuevo := (*items)[bestIdx].Gramos + delta
+			(*items)[bestIdx].Gramos = clampGramosPorTipo("C", nuevo)
+			return
+		}
+	}
+
+	// si no hay carbos, intenta con grasas
+	if existeTipo(*items, "G") {
+		bestIdx := -1
+		bestCal := -1.0
+
+		for i, item := range *items {
+			if item.Tipo != "G" {
+				continue
+			}
+			if item.Alimento.Calorias > bestCal {
+				bestCal = item.Alimento.Calorias
+				bestIdx = i
+			}
+		}
+
+		if bestIdx >= 0 && bestCal > 0 {
+			delta := (diffCal / bestCal) * gramosPorcionRef
+			nuevo := (*items)[bestIdx].Gramos + delta
+			(*items)[bestIdx].Gramos = clampGramosPorTipo("G", nuevo)
+		}
+	}
 }
 
 func agruparAlimentosPorMomento(alimentos []models.NutricionAlimento) AlimentosPorMomento {
@@ -1105,7 +1356,7 @@ func (s *NutricionService) CreateRegistroComida(pacienteID uint, req models.Crea
 		fecha = time.Now()
 	}
 
-	// Si viene de un detalle de menú, verificar que no exista ya un registro consumido
+	// Si viene de un detalle de menú, verificar que no xista ya un registro consumido
 	if req.MenuDetalleID != nil {
 		fechaStr := fecha.Format("2006-01-02")
 		if existing, err := s.repo.FindRegistroComidaByMenuDetalle(pacienteID, *req.MenuDetalleID, fechaStr); err == nil && existing != nil {
@@ -1113,7 +1364,6 @@ func (s *NutricionService) CreateRegistroComida(pacienteID uint, req models.Crea
 		}
 	}
 
-	// Si viene del plan y no se enviaron calorías, tomarlas del detalle de menú
 	calConsumidas := req.CaloriasConsumidas
 	if calConsumidas == nil && req.MenuDetalleID != nil {
 		if detalle, err := s.repo.FindMenuDetalleByID(*req.MenuDetalleID); err == nil && detalle.CaloriasTotal != nil {
@@ -1130,6 +1380,9 @@ func (s *NutricionService) CreateRegistroComida(pacienteID uint, req models.Crea
 		DescripcionLibre:   req.DescripcionLibre,
 		CaloriasConsumidas: calConsumidas,
 		FotoComida:         req.FotoComida,
+		ProteínasG:         req.ProteinasConsumidas,
+		GrasasG:            req.GrasasConsumidas,
+		CarbohidratosG:     req.CarbosConsumidos,
 		Notas:              req.Notas,
 		Estado:             models.EstadoRegistroComidaConsumida, // siempre 'C' al crear
 		State:              "A",
@@ -1203,7 +1456,9 @@ func (s *NutricionService) GetResumenDiario(pacienteID uint, fecha string) (*mod
 	}()
 	wg.Wait()
 
-	calObjetivo = *dieta.CaloriasDiaObjetivo
+	if dieta != nil && dieta.CaloriasDiaObjetivo != nil {
+		calObjetivo = *dieta.CaloriasDiaObjetivo
+	}
 	var calCon, prot, carb, gras, calQuem float64
 
 	var consumidoIDs []uint

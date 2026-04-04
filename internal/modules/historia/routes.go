@@ -20,8 +20,12 @@ func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMidd
 	historia.Use(authMiddleware.RequireAuth())
 	historia.Use(authMiddleware.RequireRoles(authModels.RolAdmin, authModels.RolNutriologo, authModels.RolPsicologo, authModels.RolSuperAdmin))
 	{
-		// Catálogos
+		// TipoFormulario CRUD
 		historia.GET("/tipos-formulario", handler.ListTiposFormulario)
+		historia.POST("/tipos-formulario", handler.CreateTipoFormulario)
+		historia.GET("/tipos-formulario/:id", handler.GetTipoFormulario)
+		historia.PUT("/tipos-formulario/:id", handler.UpdateTipoFormulario)
+		historia.DELETE("/tipos-formulario/:id", handler.DeleteTipoFormulario)
 
 		// Formularios CRUD
 		historia.GET("/formularios", handler.ListFormularios)

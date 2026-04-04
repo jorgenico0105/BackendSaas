@@ -29,7 +29,7 @@ func main() {
 	//database.RunMigrations()
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     "162.243.161.156:6379",
-		Password: "",
+		Password: "nico1234.",
 		DB:       0, // use default DB
 		Protocol: 2,
 	})
@@ -40,7 +40,7 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	openiaService := openiaService.NewOpenIaService()
+	openiaService := openiaService.NewOpenIaService(rdb)
 
 	router := gin.Default()
 	router.Use(middleware.CORS())

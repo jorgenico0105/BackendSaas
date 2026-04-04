@@ -1,7 +1,9 @@
 package repositories
 
 import (
+	"log"
 	"saas-medico/internal/modules/nutricion/models"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -19,6 +21,23 @@ type DatosRequerimeintos struct {
 	ID              uint
 	TipoComidaID    uint
 	GrupoAlimentoID uint
+}
+
+func (r *NutricionRepository) DesactivarMenusAnitguos() {
+	today := time.Now().Format("2006-01-02")
+	err := r.db.
+		Model(&models.NutricionMenu{}).
+		Where("fecha_fin = ? AND state = ?", today, "A").
+		Updates(map[string]interface{}{
+			"state":  "I",
+			"estado": "FIN",
+		}).Error
+	if err != nil {
+		log.Println("error desactivando menús:", err)
+		return
+	}
+
+	log.Println("menús desactivados correctamente")
 }
 
 func (r *NutricionRepository) GetRequerimientosPorComida() (map[uint][]uint, error) {
@@ -55,6 +74,10 @@ func (r *NutricionRepository) FindAlimentoByID(id uint) (*models.NutricionAlimen
 
 func (r *NutricionRepository) CreateAlimento(a *models.NutricionAlimento) error {
 	return r.db.Create(a).Error
+}
+
+func (r *NutricionRepository) UpdateAlimento(a *models.NutricionAlimento) error {
+	return r.db.Save(a).Error
 }
 
 func (r *NutricionRepository) FindTipoComida() ([]models.NutricionTipoComida, error) {
@@ -138,10 +161,24 @@ func (r *NutricionRepository) FindMenuAlimentoByID(id uint) (*models.NutricionMe
 // ─── Menú semanal ─────────────────────────────────────────────────────────────
 
 func (r *NutricionRepository) CreateMenu(m *models.NutricionMenu) error {
-
 	return r.db.Create(m).Error
 }
-
+func (r *NutricionRepository) CreateMenuPlantilla(mp *models.NutricionMenuPlantilla) error {
+	return r.db.Create(mp).Error
+}
+func (r *NutricionRepository) GetMenuPlantilla(dietaID uint) (*models.NutricionMenuPlantilla, error) {
+	var mp models.NutricionMenuPlantilla
+	err := r.db.Where("dieta_paciente_id = ?", dietaID).Find(&mp).Error
+	if err != nil {
+		return nil, err
+	}
+	return &mp, nil
+}
+func (r *NutricionRepository) UpdateMenuPlantilla(dietaPacienteID, newMenuID uint) error {
+	return r.db.Model(&models.NutricionMenuPlantilla{}).
+		Where("dieta_paciente_id = ?", dietaPacienteID).
+		Update("menu_id", newMenuID).Error
+}
 func (r *NutricionRepository) FindMenusByDieta(dietaID uint) ([]models.NutricionMenu, error) {
 	var list []models.NutricionMenu
 	err := r.db.Where("dieta_paciente_id = ? AND state = 'A'", dietaID).
@@ -163,11 +200,11 @@ func (r *NutricionRepository) UpdateMenu(m *models.NutricionMenu) error {
 	return r.db.Save(m).Error
 }
 
-// FindMenusRequierenCambio devuelve menús activos cuya fecha_fin es mañana
 func (r *NutricionRepository) FindMenusRequierenCambio() ([]models.NutricionMenu, error) {
 	var list []models.NutricionMenu
-	err := r.db.Where("fecha_fin = DATE_ADD(CURDATE(), INTERVAL 1 DAY) AND estado = 'ACTIVO' AND state = 'A'").
+	err := r.db.Preload("Dieta").Preload("Dieta.Paciente").Where("fecha_fin = DATE_ADD(CURDATE(), INTERVAL 1 DAY) AND state = 'A'").
 		Find(&list).Error
+
 	return list, err
 }
 
@@ -246,7 +283,7 @@ func (r *NutricionRepository) CreatePreferencia(p *models.NutricionPreferenciaAl
 
 func (r *NutricionRepository) FindPreferenciasByPaciente(pacienteID uint) ([]models.NutricionPreferenciaAlimento, error) {
 	var list []models.NutricionPreferenciaAlimento
-	err := r.db.Where("paciente_id = ? AND state = 'A'", pacienteID).Find(&list).Error
+	err := r.db.Preload("Alimento").Where("paciente_id = ? AND state = 'A'", pacienteID).Find(&list).Error
 	return list, err
 }
 

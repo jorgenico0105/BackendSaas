@@ -8,6 +8,7 @@ import (
 	"saas-medico/internal/modules/nutricion/services"
 
 	"saas-medico/internal/shared/openia"
+	"saas-medico/internal/shared/scheduler"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -18,6 +19,8 @@ func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMidd
 	service := services.NewNutricionService(repo, redis)
 	h := handlers.NewNutricionHandler(service, openiaService)
 
+	scheduler.StartCron(service.DeactivateOldMenus)
+
 	n := router.Group("/nutricion")
 	n.Use(authMiddleware.RequireAuth())
 	{
@@ -25,6 +28,7 @@ func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMidd
 		n.GET("/alimentos", h.ListAlimentos)
 		n.GET("/alimentos/:id", h.GetAlimento)
 		n.POST("/alimentos", h.CreateAlimento)
+		n.PUT("/alimentos/:id", h.UpdateAlimento)
 
 		n.GET("/dietas-catalogo", h.ListDietasCatalogo)
 
@@ -83,8 +87,6 @@ func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMidd
 			pac.POST("/preferencias", h.AddPreferencia)
 			pac.DELETE("/preferencias/:id", h.DeletePreferencia)
 
-			// Generar dierta (!! importante)
-
 			// Síntomas
 			pac.GET("/sintomas", h.ListSintomas)
 			pac.POST("/sintomas", h.CreateSintoma)
@@ -99,21 +101,19 @@ func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMidd
 			pac.POST("/registros-comida/:registroId/alimentos", h.AddRegistroAlimento)
 			pac.POST("/registros-comida/:registroId/foto", h.UploadFotoComida)
 			pac.PATCH("/registros-comida/:registroId/consumir", h.MarcarRegistroComidaConsumida)
+			pac.POST("/registros-comida/fuera-plan")
 
 			pac.GET("/registros-ejercicio", h.ListRegistrosEjercicio)
 			pac.POST("/registros-ejercicio", h.CreateRegistroEjercicio)
 
-			// Resumen diario unificado (comidas + ejercicios + progreso) para móvil y web
 			pac.GET("/resumen-diario", h.GetResumenDiario)
 
-			// Progreso (historial de peso)
 			pac.GET("/progreso", h.ListProgreso)
 			pac.POST("/progreso", h.AddProgreso)
 
 			// XP y logros
 			pac.GET("/xp", h.GetXP)
 			pac.GET("/logros", h.ListLogros)
-
 			pac.POST("/ask-ia", h.ChatWhitIa)
 		}
 	}

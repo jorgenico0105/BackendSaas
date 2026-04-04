@@ -143,7 +143,7 @@ type NutricionDietaPaciente struct {
 	Nombre              string          `gorm:"size:150;not null" json:"nombre"`
 	Descripcion         string          `gorm:"type:text" json:"descripcion,omitempty"`
 	Objetivo            string          `gorm:"size:150" json:"objetivo,omitempty"`
-	ResultadoEsperado   string          `gorm:"type:text" json:"resultado_esperado,omitempty"`
+	PesoObjetivo        *float64        `gorm:"type:decimal(5,2);column:resultado_esperado" json:"resultado_esperado,omitempty"`
 	FechaInicio         time.Time       `gorm:"type:date;not null" json:"fecha_inicio"`
 	DuracionDias        int             `gorm:"not null;default:7" json:"duracion_dias"`
 	NumComidas          int             `gorm:"not null;default:5" json:"num_comidas"`
@@ -184,6 +184,7 @@ type NutricionMenu struct {
 	CreadoEn        time.Time              `gorm:"autoCreateTime;column:creado_en" json:"creado_en"`
 	ActualizadoEn   time.Time              `gorm:"autoUpdateTime;column:actualizado_en" json:"actualizado_en"`
 	Detalles        []NutricionMenuDetalle `gorm:"foreignKey:MenuID;references:ID" json:"detalles"`
+	Dieta           NutricionDietaPaciente `gorm:"foreignKey:DietaPacienteID;references:ID" json:"dieta"`
 }
 
 func (NutricionMenu) TableName() string { return "nutricion_menu" }
@@ -210,6 +211,15 @@ type NutricionMenuDetalle struct {
 }
 
 func (NutricionMenuDetalle) TableName() string { return "nutricion_menu_detalle" }
+
+// Nutricion Plantilla Menu
+type NutricionMenuPlantilla struct {
+	ID              uint `gorm:"primaryKey;autoIncrement" json:"id"`
+	MenuID          uint `gorm:"not null;index;uniqueIndex:udx_menu_dia_comida" json:"menu_id"`
+	DietaPacienteID uint `gorm:"not null;index" json:"dieta_paciente_id"`
+}
+
+func (NutricionMenuPlantilla) TableName() string { return "nutricion_menu_plantilla" }
 
 // NutricionMenuAlimento — alimentos asignados a un ítem del detalle del menú.
 type NutricionMenuAlimento struct {
@@ -272,14 +282,15 @@ const (
 
 // NutricionPreferenciaAlimento — gustos y disgustos alimentarios del paciente
 type NutricionPreferenciaAlimento struct {
-	ID          uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	PacienteID  uint      `gorm:"not null;index" json:"paciente_id"`
-	AlimentoID  *uint     `gorm:"index" json:"alimento_id,omitempty"`
-	NombreLibre string    `gorm:"size:150" json:"nombre_libre,omitempty"`
-	Tipo        string    `gorm:"size:20;not null" json:"tipo"` // GUSTO, DISGUSTO, INTOLERANCIA, ALERGIA
-	Notas       string    `gorm:"size:255" json:"notas,omitempty"`
-	State       string    `gorm:"type:char(1);default:'A';not null" json:"state"`
-	CreadoEn    time.Time `gorm:"autoCreateTime;column:creado_en" json:"creado_en"`
+	ID          uint              `gorm:"primaryKey;autoIncrement" json:"id"`
+	PacienteID  uint              `gorm:"not null;index" json:"paciente_id"`
+	AlimentoID  *uint             `gorm:"index" json:"alimento_id,omitempty"`
+	NombreLibre string            `gorm:"size:150" json:"nombre_libre,omitempty"`
+	Tipo        string            `gorm:"size:20;not null" json:"tipo"` // GUSTO, DISGUSTO, INTOLERANCIA, ALERGIA
+	Notas       string            `gorm:"size:255" json:"notas,omitempty"`
+	State       string            `gorm:"type:char(1);default:'A';not null" json:"state"`
+	CreadoEn    time.Time         `gorm:"autoCreateTime;column:creado_en" json:"creado_en"`
+	Alimento    NutricionAlimento `gorm:"foreignKey:AlimentoID"`
 }
 
 func (NutricionPreferenciaAlimento) TableName() string { return "nutricion_preferencias_alimento" }
@@ -542,12 +553,30 @@ type CreateAlimentoRequest struct {
 	Merienda       bool     `json:"merienda"`
 }
 
+type UpdateAlimentoRequest struct {
+	Nombre         string   `json:"nombre" binding:"required,min=2,max=150"`
+	Descripcion    string   `json:"descripcion"`
+	Categoria      string   `json:"categoria"`
+	GramosPorcion  float64  `json:"gramos_porcion"`
+	Calorias       float64  `json:"calorias" binding:"required"`
+	ProteínasG     float64  `json:"proteinas_g"`
+	CarbohidratosG float64  `json:"carbohidratos_g"`
+	GrasasG        float64  `json:"grasas_g"`
+	FibraG         *float64 `json:"fibra_g"`
+	AzucaresG      *float64 `json:"azucares_g"`
+	SodioMg        *float64 `json:"sodio_mg"`
+	Desayuno       bool     `json:"desayuno"`
+	MediaTardeMana bool     `json:"media_tarde_mana"`
+	Almuerzo       bool     `json:"almuerzo"`
+	Merienda       bool     `json:"merienda"`
+}
+
 type CreateDietaRequest struct {
 	DietaCatalogoID     *uint    `json:"dieta_catalogo_id"`
 	Nombre              string   `json:"nombre" binding:"required,min=2,max=150"`
 	Descripcion         string   `json:"descripcion"`
 	Objetivo            string   `json:"objetivo"`
-	ResultadoEsperado   string   `json:"resultado_esperado"`
+	ResultadoEsperado   *float64 `json:"resultado_esperado"`
 	FechaInicio         string   `json:"fecha_inicio" binding:"required"`
 	DuracionDias        int      `json:"duracion_dias"`
 	NumComidas          int      `json:"num_comidas"`
@@ -562,7 +591,7 @@ type UpdateDietaRequest struct {
 	Nombre              string   `json:"nombre"`
 	Descripcion         string   `json:"descripcion"`
 	Objetivo            string   `json:"objetivo"`
-	ResultadoEsperado   string   `json:"resultado_esperado"`
+	ResultadoEsperado   *float64 `json:"resultado_esperado"`
 	NumComidas          int      `json:"num_comidas"`
 	CaloriasDiaObjetivo *float64 `json:"calorias_dia_objetivo"`
 	ProteínasGDia       *float64 `json:"proteinas_g_dia"`
@@ -644,14 +673,17 @@ type CreateSintomaRequest struct {
 }
 
 type CreateRegistroComidaRequest struct {
-	Fecha              string   `json:"fecha" binding:"required"`
-	TipoComidaID       uint     `json:"tipo_comida_id" binding:"required"`
-	MenuDetalleID      *uint    `json:"menu_detalle_id"`
-	FueraDePlan        bool     `json:"fuera_de_plan"`
-	DescripcionLibre   string   `json:"descripcion_libre"`
-	CaloriasConsumidas *float64 `json:"calorias_consumidas"`
-	FotoComida         string   `json:"foto_comida"`
-	Notas              string   `json:"notas"`
+	Fecha               string   `json:"fecha" binding:"required"`
+	TipoComidaID        uint     `json:"tipo_comida_id" binding:"required"`
+	MenuDetalleID       *uint    `json:"menu_detalle_id"`
+	FueraDePlan         bool     `json:"fuera_de_plan"`
+	DescripcionLibre    string   `json:"descripcion_libre"`
+	CaloriasConsumidas  *float64 `json:"calorias_consumidas"`
+	FotoComida          string   `json:"foto_comida"`
+	Notas               string   `json:"notas"`
+	ProteinasConsumidas *float64 `json:"proteinas_g"`
+	GrasasConsumidas    *float64 `json:"grasas_g"`
+	CarbosConsumidos    *float64 `json:"carbohidratos_g"`
 }
 
 type AddRegistroAlimentoRequest struct {

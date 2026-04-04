@@ -30,8 +30,35 @@ func (s *HistoriaService) GetFormulario(id uint) (*models.Formulario, error) {
 	return s.repo.FindFormularioByID(id)
 }
 
-func (s *HistoriaService) ListTiposFormulario() ([]models.TipoFormulario, error) {
-	return s.repo.FindTiposFormulario()
+func (s *HistoriaService) ListTiposFormulario(rolID int) ([]models.TipoFormulario, error) {
+	return s.repo.FindTiposFormulario(rolID)
+}
+
+func (s *HistoriaService) GetTipoFormulario(id uint) (*models.TipoFormulario, error) {
+	return s.repo.FindTipoFormularioByID(id)
+}
+
+func (s *HistoriaService) CreateTipoFormulario(req models.CreateTipoFormularioRequest, userID, rolID uint) (*models.TipoFormulario, error) {
+	t := &models.TipoFormulario{
+		Codigo:      req.Codigo,
+		Nombre:      req.Nombre,
+		Descripcion: req.Descripcion,
+		State:       "A",
+		CreadoPor:   userID,
+		RoleID:      rolID,
+	}
+	if err := s.repo.CreateTipoFormulario(t); err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+func (s *HistoriaService) UpdateTipoFormulario(id uint, req models.UpdateTipoFormularioRequest) error {
+	return s.repo.UpdateTipoFormulario(id, req.Nombre, req.Descripcion)
+}
+
+func (s *HistoriaService) DeleteTipoFormulario(id uint) error {
+	return s.repo.DeleteTipoFormulario(id)
 }
 
 func (s *HistoriaService) CreateFormularioCompleto(req models.CreateFormularioRequest, usuarioID, clinicaID uint) (*models.Formulario, error) {

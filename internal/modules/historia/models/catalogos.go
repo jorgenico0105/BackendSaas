@@ -5,13 +5,14 @@ import "time"
 // ─── Catálogos ────────────────────────────────────────────────────────────────
 
 type TipoFormulario struct {
-	ID          uint   `gorm:"primaryKey;autoIncrement" json:"id"`
-	Codigo      string `gorm:"type:char(3);uniqueIndex;not null" json:"codigo"`
-	Nombre      string `gorm:"size:100;not null" json:"nombre"`
-	Descripcion string `gorm:"size:255" json:"descripcion,omitempty"`
-	State       string `gorm:"type:char(1);default:'A'" json:"state"`
+	ID          uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	Codigo      string    `gorm:"type:char(3);uniqueIndex;not null" json:"codigo"`
+	Nombre      string    `gorm:"size:100;not null" json:"nombre"`
+	Descripcion string    `gorm:"size:255" json:"descripcion,omitempty"`
+	State       string    `gorm:"type:char(1);default:'A'" json:"state"`
 	CreadoEn    time.Time `gorm:"autoCreateTime;column:created_at" json:"created_at"`
-	CreadoPor   uint   `json:"created_by,omitempty"`
+	CreadoPor   uint      `json:"created_by,omitempty"`
+	RoleID      uint      `gorm:"not null;index" json:"rol_id"`
 }
 
 func (TipoFormulario) TableName() string { return "tipo_formulario" }

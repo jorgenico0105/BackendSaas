@@ -1,5 +1,18 @@
 package models
 
+// ─── TipoFormulario CRUD ──────────────────────────────────────────────────────
+
+type CreateTipoFormularioRequest struct {
+	Codigo      string `json:"codigo" binding:"required,len=3"`
+	Nombre      string `json:"nombre" binding:"required,max=100"`
+	Descripcion string `json:"descripcion" binding:"omitempty,max=255"`
+}
+
+type UpdateTipoFormularioRequest struct {
+	Nombre      string `json:"nombre" binding:"omitempty,max=100"`
+	Descripcion string `json:"descripcion" binding:"omitempty,max=255"`
+}
+
 // ─── Formularios CRUD ─────────────────────────────────────────────────────────
 
 type CreateFormularioRequest struct {

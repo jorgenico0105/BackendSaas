@@ -31,12 +31,71 @@ func paramUint(c *gin.Context, key string) (uint, bool) {
 // ─── Formularios ──────────────────────────────────────────────────────────────
 
 func (h *HistoriaHandler) ListTiposFormulario(c *gin.Context) {
-	list, err := h.service.ListTiposFormulario()
+	rolID := c.GetUint("rolID")
+	list, err := h.service.ListTiposFormulario(int(rolID))
 	if err != nil {
 		responses.InternalError(c, "Error al listar tipos de formulario")
 		return
 	}
 	responses.Success(c, "Tipos de formulario", list)
+}
+
+func (h *HistoriaHandler) GetTipoFormulario(c *gin.Context) {
+	id, ok := paramUint(c, "id")
+	if !ok {
+		return
+	}
+	t, err := h.service.GetTipoFormulario(id)
+	if err != nil {
+		responses.NotFound(c, "Tipo de formulario no encontrado")
+		return
+	}
+	responses.Success(c, "Tipo de formulario", t)
+}
+
+func (h *HistoriaHandler) CreateTipoFormulario(c *gin.Context) {
+	var req models.CreateTipoFormularioRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		responses.BadRequest(c, "Datos inválidos: "+err.Error())
+		return
+	}
+	userID := c.GetUint("userID")
+	rolID := c.GetUint("rolID")
+	t, err := h.service.CreateTipoFormulario(req, userID, rolID)
+	if err != nil {
+		responses.InternalError(c, "Error al crear tipo de formulario: "+err.Error())
+		return
+	}
+	responses.Created(c, "Tipo de formulario creado", t)
+}
+
+func (h *HistoriaHandler) UpdateTipoFormulario(c *gin.Context) {
+	id, ok := paramUint(c, "id")
+	if !ok {
+		return
+	}
+	var req models.UpdateTipoFormularioRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		responses.BadRequest(c, "Datos inválidos: "+err.Error())
+		return
+	}
+	if err := h.service.UpdateTipoFormulario(id, req); err != nil {
+		responses.InternalError(c, "Error al actualizar tipo de formulario: "+err.Error())
+		return
+	}
+	responses.Success(c, "Tipo de formulario actualizado", nil)
+}
+
+func (h *HistoriaHandler) DeleteTipoFormulario(c *gin.Context) {
+	id, ok := paramUint(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.service.DeleteTipoFormulario(id); err != nil {
+		responses.InternalError(c, "Error al eliminar tipo de formulario: "+err.Error())
+		return
+	}
+	responses.Success(c, "Tipo de formulario eliminado", nil)
 }
 
 func (h *HistoriaHandler) CreateFormulario(c *gin.Context) {

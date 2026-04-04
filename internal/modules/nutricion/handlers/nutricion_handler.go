@@ -70,6 +70,24 @@ func (h *NutricionHandler) CreateAlimento(c *gin.Context) {
 	responses.Created(c, "Alimento creado", a)
 }
 
+func (h *NutricionHandler) UpdateAlimento(c *gin.Context) {
+	id, ok := paramUint(c, "id")
+	if !ok {
+		return
+	}
+	var req models.UpdateAlimentoRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		responses.BadRequest(c, "Datos inválidos")
+		return
+	}
+	a, err := h.svc.UpdateAlimento(id, req)
+	if err != nil {
+		responses.NotFound(c, "Alimento no encontrado")
+		return
+	}
+	responses.Success(c, "Alimento actualizado", a)
+}
+
 // ─── Catálogo dietas ──────────────────────────────────────────────────────────
 
 func (h *NutricionHandler) ListDietasCatalogo(c *gin.Context) {

@@ -52,10 +52,31 @@ func (r *HistoriaRepository) DeleteFormulario(id uint) error {
 	return r.db.Model(&models.Formulario{}).Where("id = ?", id).Update("state", "I").Error
 }
 
-func (r *HistoriaRepository) FindTiposFormulario() ([]models.TipoFormulario, error) {
+func (r *HistoriaRepository) FindTiposFormulario(rolID int) ([]models.TipoFormulario, error) {
 	var list []models.TipoFormulario
-	err := r.db.Where("state = 'A'").Find(&list).Error
+
+	err := r.db.Where("state = 'A' and role_id = ?", rolID).Find(&list).Error
+	//log.Fatal(err)
 	return list, err
+}
+
+func (r *HistoriaRepository) FindTipoFormularioByID(id uint) (*models.TipoFormulario, error) {
+	var t models.TipoFormulario
+	err := r.db.First(&t, "id = ? AND state = 'A'", id).Error
+	return &t, err
+}
+
+func (r *HistoriaRepository) CreateTipoFormulario(t *models.TipoFormulario) error {
+	return r.db.Create(t).Error
+}
+
+func (r *HistoriaRepository) UpdateTipoFormulario(id uint, nombre, descripcion string) error {
+	return r.db.Model(&models.TipoFormulario{}).Where("id = ? AND state = 'A'", id).
+		Updates(map[string]interface{}{"nombre": nombre, "descripcion": descripcion}).Error
+}
+
+func (r *HistoriaRepository) DeleteTipoFormulario(id uint) error {
+	return r.db.Model(&models.TipoFormulario{}).Where("id = ?", id).Update("state", "I").Error
 }
 
 func (r *HistoriaRepository) CreatePregunta(p *models.FormularioPregunta) error {
