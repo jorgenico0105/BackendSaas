@@ -44,6 +44,17 @@ type CreateOpcionRequest struct {
 	Puntos   float64 `json:"puntos"`
 }
 
+// ─── FormularioCita CRUD ──────────────────────────────────────────────────────
+
+type CreateFormularioCitaRequest struct {
+	FormularioID uint `json:"formulario_id" binding:"required"`
+	TipoCitaID   uint `json:"tipo_cita_id" binding:"required"`
+}
+
+type UpdateFormularioCitaRequest struct {
+	FormularioID uint `json:"formulario_id" binding:"required"`
+}
+
 // ─── Historia Clínica ─────────────────────────────────────────────────────────
 
 type CreateHistoriaClinicaRequest struct {

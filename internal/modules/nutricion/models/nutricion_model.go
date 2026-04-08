@@ -207,6 +207,7 @@ type NutricionMenuDetalle struct {
 	State               string                  `gorm:"type:char(1);default:'A';not null" json:"state"`
 	CreadoEn            time.Time               `gorm:"autoCreateTime;column:creado_en" json:"creado_en"`
 	ActualizadoEn       time.Time               `gorm:"autoUpdateTime;column:actualizado_en" json:"actualizado_en"`
+	NombreReceta        string                  `gorm:"size:150" json:"nombre_receta,omitempty"`
 	Alimentos           []NutricionMenuAlimento `gorm:"foreignKey:MenuDetalleID;references:ID" json:"alimentos"`
 }
 
@@ -621,7 +622,6 @@ type AddAlimentoMenuRequest struct {
 	Observacion     string  `json:"observacion"`
 }
 
-// CalcularFormulasRequest — datos físicos para calcular IMC, ICC y Harris-Benedict on demand
 type CalcularFormulasRequest struct {
 	Sexo            string   `json:"sexo" binding:"required,oneof=M F"`
 	EdadAnos        *int     `json:"edad_anos"`

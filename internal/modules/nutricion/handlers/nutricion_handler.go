@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 
@@ -29,6 +30,37 @@ func paramUint(c *gin.Context, key string) (uint, bool) {
 		return 0, false
 	}
 	return uint(n), true
+}
+
+// Reportes
+
+func (h *NutricionHandler) CreateMenuReport(c *gin.Context) {
+	id, ok := paramUint(c, "menuID")
+	if !ok {
+		return
+	}
+
+	menu, err := h.svc.GetMenu(uint(id))
+	if err != nil {
+		responses.NotFound(c, "Menú no encontrado")
+		return
+	}
+
+	dieta, err := h.svc.GetDieta(menu.DietaPacienteID)
+	if err != nil {
+		responses.NotFound(c, "Dieta no encontrada")
+		return
+	}
+
+	outputPath, err := h.svc.GetMenuReport(dieta, menu)
+	if err != nil {
+		responses.InternalError(c, "Error al generar el PDF")
+		return
+	}
+
+	filename := fmt.Sprintf("menu_%d.pdf", id)
+	c.Header("Content-Disposition", "attachment; filename="+filename)
+	c.File(outputPath)
 }
 
 // ─── Alimentos ────────────────────────────────────────────────────────────────
@@ -847,6 +879,20 @@ func (h *NutricionHandler) ListArchivosPDF(c *gin.Context) {
 	}
 
 	list, err := h.svc.ListArchivosPDF(clinicaID, pacienteID, tipoRecursoID)
+	if err != nil {
+		responses.InternalError(c, "Error al listar archivos PDF")
+		return
+	}
+	responses.Success(c, "Archivos PDF", list)
+}
+
+func (h *NutricionHandler) ListArchivosPDFByPaciente(c *gin.Context) {
+	clinicaID := c.GetUint("clinicaID")
+	pacienteID, ok := paramUint(c, "pacienteID")
+	if !ok {
+		return
+	}
+	list, err := h.svc.ListArchivosPDFByUser(clinicaID, pacienteID)
 	if err != nil {
 		responses.InternalError(c, "Error al listar archivos PDF")
 		return

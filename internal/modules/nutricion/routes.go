@@ -22,8 +22,10 @@ func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMidd
 	scheduler.StartCron(service.DeactivateOldMenus)
 
 	n := router.Group("/nutricion")
+
 	n.Use(authMiddleware.RequireAuth())
 	{
+		n.GET("/generate-menu-pdf/:menuID", h.CreateMenuReport)
 		// ─── Catálogos ─────────────────────────────────────────────────
 		n.GET("/alimentos", h.ListAlimentos)
 		n.GET("/alimentos/:id", h.GetAlimento)
@@ -48,6 +50,7 @@ func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMidd
 
 		// ─── Archivos PDF (biblioteca de la clínica/paciente) ──────────
 		n.GET("/archivos-pdf", h.ListArchivosPDF)
+		n.GET("/archivos-pdf/:pacienteID", h.ListArchivosPDFByPaciente)
 		n.POST("/archivos-pdf", h.CreateArchivoPDF)
 		n.DELETE("/archivos-pdf/:id", h.DeleteArchivoPDF)
 

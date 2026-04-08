@@ -306,3 +306,39 @@ func (r *HistoriaRepository) FindImagenesByPaciente(pacienteID uint) ([]models.P
 	err := r.db.Where("paciente_id = ?", pacienteID).Order("creado_en DESC").Find(&list).Error
 	return list, err
 }
+
+// ─── FormularioCita ───────────────────────────────────────────────────────────
+
+func (r *HistoriaRepository) CreateFormularioCita(fc *models.FormularioCita) error {
+	return r.db.Create(fc).Error
+}
+
+func (r *HistoriaRepository) FindFormulariosCita() ([]models.FormularioCita, error) {
+	var list []models.FormularioCita
+	err := r.db.Preload("Formulario").Find(&list).Error
+	return list, err
+}
+
+func (r *HistoriaRepository) FindFormulariosCitaByTipo(tipoCitaID uint) ([]models.FormularioCita, error) {
+	var list []models.FormularioCita
+	err := r.db.
+		Preload("Formulario.Preguntas", "state = 'A'").
+		Preload("Formulario.Preguntas.Opciones", "state = 'A'").
+		Where("tipo_cita_id = ?", tipoCitaID).
+		Find(&list).Error
+	return list, err
+}
+
+func (r *HistoriaRepository) FindFormularioCitaByID(id uint) (*models.FormularioCita, error) {
+	var fc models.FormularioCita
+	err := r.db.Preload("Formulario").First(&fc, id).Error
+	return &fc, err
+}
+
+func (r *HistoriaRepository) UpdateFormularioCita(id uint, formularioID uint) error {
+	return r.db.Model(&models.FormularioCita{}).Where("id = ?", id).Update("formulario_id", formularioID).Error
+}
+
+func (r *HistoriaRepository) DeleteFormularioCita(id uint) error {
+	return r.db.Delete(&models.FormularioCita{}, id).Error
+}

@@ -318,13 +318,13 @@ func (h *HistoriaHandler) UploadPacienteImagen(c *gin.Context) {
 	}
 
 	descripcion := c.PostForm("descripcion")
-
+	tipo := uint(6)
 	img := &models.PacienteImagen{
 		PacienteID:    pacienteID,
 		MedicoID:      &medicoID,
 		NombreArchivo: result.FileName,
 		UrlArchivo:    result.FilePath,
-		TipoImagen:    1,
+		TipoImagen:    &tipo,
 		Descripcion:   descripcion,
 	}
 	if err := h.service.AddPacienteImagen(img); err != nil {
@@ -345,4 +345,72 @@ func (h *HistoriaHandler) ListPacienteImagenes(c *gin.Context) {
 		return
 	}
 	responses.Success(c, "Imágenes del paciente", list)
+}
+
+// ─── FormularioCita ───────────────────────────────────────────────────────────
+
+func (h *HistoriaHandler) CreateFormularioCita(c *gin.Context) {
+	var req models.CreateFormularioCitaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		responses.BadRequest(c, "Datos inválidos: "+err.Error())
+		return
+	}
+	fc, err := h.service.CreateFormularioCita(req)
+	if err != nil {
+		responses.InternalError(c, "Error al crear asignación: "+err.Error())
+		return
+	}
+	responses.Created(c, "Formulario asignado a tipo de cita", fc)
+}
+
+func (h *HistoriaHandler) ListFormulariosCita(c *gin.Context) {
+	list, err := h.service.ListFormulariosCita()
+	if err != nil {
+		responses.InternalError(c, "Error al listar formularios de cita")
+		return
+	}
+	responses.Success(c, "Formularios de cita", list)
+}
+
+func (h *HistoriaHandler) GetFormulariosCitaByTipo(c *gin.Context) {
+	tipoCitaID, ok := paramUint(c, "tipoCitaId")
+	if !ok {
+		return
+	}
+	list, err := h.service.GetFormulariosCitaByTipo(tipoCitaID)
+	if err != nil {
+		responses.InternalError(c, "Error al obtener formularios del tipo de cita")
+		return
+	}
+	responses.Success(c, "Formularios del tipo de cita", list)
+}
+
+func (h *HistoriaHandler) UpdateFormularioCita(c *gin.Context) {
+	id, ok := paramUint(c, "id")
+	if !ok {
+		return
+	}
+	var req models.UpdateFormularioCitaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		responses.BadRequest(c, "Datos inválidos: "+err.Error())
+		return
+	}
+	fc, err := h.service.UpdateFormularioCita(id, req)
+	if err != nil {
+		responses.InternalError(c, "Error al actualizar asignación: "+err.Error())
+		return
+	}
+	responses.Success(c, "Asignación actualizada", fc)
+}
+
+func (h *HistoriaHandler) DeleteFormularioCita(c *gin.Context) {
+	id, ok := paramUint(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.service.DeleteFormularioCita(id); err != nil {
+		responses.InternalError(c, "Error al eliminar asignación")
+		return
+	}
+	responses.Success(c, "Asignación eliminada", nil)
 }

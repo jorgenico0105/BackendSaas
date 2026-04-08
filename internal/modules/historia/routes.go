@@ -31,9 +31,16 @@ func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMidd
 		historia.GET("/formularios", handler.ListFormularios)
 		historia.POST("/formularios", handler.CreateFormulario)
 		historia.GET("/formularios/:id", handler.GetFormulario)
-		historia.PUT("/formularios/en l:id", handler.UpdateFormulario)
+		historia.PUT("/formularios/:id", handler.UpdateFormulario)
 		historia.DELETE("/formularios/:id", handler.DeleteFormulario)
 		historia.GET("/historia-clinica-form", handler.GetHistoriaClinicaByUser)
+
+		// FormularioCita — asignación de formulario por tipo de cita
+		historia.GET("/formulario-cita", handler.ListFormulariosCita)
+		historia.POST("/formulario-cita", handler.CreateFormularioCita)
+		historia.GET("/formulario-cita/tipo/:tipoCitaId", handler.GetFormulariosCitaByTipo)
+		historia.PUT("/formulario-cita/:id", handler.UpdateFormularioCita)
+		historia.DELETE("/formulario-cita/:id", handler.DeleteFormularioCita)
 
 		// Por paciente
 		paciente := historia.Group("/pacientes/:pacienteId")

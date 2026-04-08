@@ -3,11 +3,14 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"math/rand"
 	"saas-medico/internal/modules/nutricion/models"
 	"saas-medico/internal/modules/nutricion/repositories"
+	"saas-medico/internal/shared/pdfbuilder"
+	"saas-medico/internal/shared/pdfbuilder/usecases"
 	"sync"
 	"time"
 
@@ -29,6 +32,23 @@ type NutricionService struct {
 
 func NewNutricionService(repo *repositories.NutricionRepository, redis *redis.Client) *NutricionService {
 	return &NutricionService{repo: repo, redis: redis}
+}
+
+// Get Menu Report — returns the path of the generated PDF
+func (s *NutricionService) GetMenuReport(dieta *models.NutricionDietaPaciente, menu *models.NutricionMenu) (string, error) {
+	outputPath := fmt.Sprintf("storage/temp/menu_%d.pdf", menu.ID)
+	logoPath := "storage/logos/logo_biohealth.png"
+	waterMark := "storage/watermarks/watermark.png"
+	pdfS := pdfbuilder.NewPdfBuilder(waterMark)
+	m, err := pdfS.GeneratePdfBuilder()
+	if err != nil {
+		return "", err
+	}
+	useCase := usecases.NewMenuPdfUseCase(dieta, menu, m, logoPath, outputPath)
+	if err = useCase.CreatePdf(); err != nil {
+		return "", err
+	}
+	return outputPath, nil
 }
 
 // Desactivar menus
@@ -1708,6 +1728,9 @@ func (s *NutricionService) ListArchivosPDF(clinicaID uint, pacienteID *uint, tip
 	return s.repo.FindArchivosPDF(clinicaID, pacienteID, tipoRecursoID)
 }
 
+func (s *NutricionService) ListArchivosPDFByUser(clinicaID uint, pacienteID uint) ([]models.NutricionArchivoPDF, error) {
+	return s.repo.FindArchivosPDFByUser(clinicaID, pacienteID)
+}
 func (s *NutricionService) DeleteArchivoPDF(id uint) error {
 	return s.repo.DeleteArchivoPDF(id)
 }

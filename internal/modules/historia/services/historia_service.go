@@ -251,3 +251,35 @@ func (s *HistoriaService) AddPacienteImagen(img *models.PacienteImagen) error {
 func (s *HistoriaService) ListImagenesPaciente(pacienteID uint) ([]models.PacienteImagen, error) {
 	return s.repo.FindImagenesByPaciente(pacienteID)
 }
+
+// ─── FormularioCita ───────────────────────────────────────────────────────────
+
+func (s *HistoriaService) CreateFormularioCita(req models.CreateFormularioCitaRequest) (*models.FormularioCita, error) {
+	fc := &models.FormularioCita{
+		FormularioID: req.FormularioID,
+		TipoCitaID:   req.TipoCitaID,
+	}
+	if err := s.repo.CreateFormularioCita(fc); err != nil {
+		return nil, err
+	}
+	return s.repo.FindFormularioCitaByID(fc.ID)
+}
+
+func (s *HistoriaService) ListFormulariosCita() ([]models.FormularioCita, error) {
+	return s.repo.FindFormulariosCita()
+}
+
+func (s *HistoriaService) GetFormulariosCitaByTipo(tipoCitaID uint) ([]models.FormularioCita, error) {
+	return s.repo.FindFormulariosCitaByTipo(tipoCitaID)
+}
+
+func (s *HistoriaService) UpdateFormularioCita(id uint, req models.UpdateFormularioCitaRequest) (*models.FormularioCita, error) {
+	if err := s.repo.UpdateFormularioCita(id, req.FormularioID); err != nil {
+		return nil, err
+	}
+	return s.repo.FindFormularioCitaByID(id)
+}
+
+func (s *HistoriaService) DeleteFormularioCita(id uint) error {
+	return s.repo.DeleteFormularioCita(id)
+}

@@ -106,7 +106,7 @@ func (r *NutricionRepository) FindDietasByPaciente(pacienteID uint) ([]models.Nu
 
 func (r *NutricionRepository) FindDietaByID(id uint) (*models.NutricionDietaPaciente, error) {
 	var d models.NutricionDietaPaciente
-	err := r.db.First(&d, "id = ? AND state = 'A'", id).Error
+	err := r.db.Preload("Paciente").First(&d, "id = ? AND state = 'A'", id).Error
 	return &d, err
 }
 
@@ -355,7 +355,16 @@ func (r *NutricionRepository) FindArchivosPDF(clinicaID uint, pacienteID *uint, 
 	if tipoRecursoID != nil {
 		q = q.Where("nutricion_archivos_pdf.tipo = ?", *tipoRecursoID)
 	}
+
 	err := q.Order("nutricion_archivos_pdf.creado_en DESC").Find(&list).Error
+	return list, err
+}
+func (r *NutricionRepository) FindArchivosPDFByUser(clinicaID uint, pacienteID uint) ([]models.NutricionArchivoPDF, error) {
+	var list []models.NutricionArchivoPDF
+	err := r.db.Preload("TipoRecurso").
+		Where("nutricion_archivos_pdf.clinica_id = ? AND nutricion_archivos_pdf.state = 'A' AND (paciente_id IS NULL OR paciente_id = ?)", clinicaID, pacienteID).
+		Order("nutricion_archivos_pdf.creado_en DESC").
+		Find(&list).Error
 	return list, err
 }
 

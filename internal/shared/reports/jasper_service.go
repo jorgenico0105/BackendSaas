@@ -8,18 +8,18 @@ import (
 )
 
 const (
-	ReportsDirectory  = "storage/reports"
+	ReportsDirectory   = "storage/reports"
 	TemplatesDirectory = "resources/jasper_templates"
 )
 
 type ReportFormat string
 
 const (
-	FormatPDF   ReportFormat = "pdf"
-	FormatXLS   ReportFormat = "xls"
-	FormatXLSX  ReportFormat = "xlsx"
-	FormatCSV   ReportFormat = "csv"
-	FormatHTML  ReportFormat = "html"
+	FormatPDF  ReportFormat = "pdf"
+	FormatXLS  ReportFormat = "xls"
+	FormatXLSX ReportFormat = "xlsx"
+	FormatCSV  ReportFormat = "csv"
+	FormatHTML ReportFormat = "html"
 )
 
 type ReportParams struct {

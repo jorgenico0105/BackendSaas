@@ -5,14 +5,14 @@ import "time"
 // ─── Historia Clínica ──────────────────────────────────────────────────────────
 
 type HistoriaClinica struct {
-	ID                 uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	PacienteID         uint      `gorm:"not null;index" json:"paciente_id"`
-	MedicoID           uint      `gorm:"not null;index" json:"medico_id"`
-	FormularioID       uint      `gorm:"not null;index" json:"formulario_id"`
-	Fecha              time.Time `gorm:"not null" json:"fecha"`
-	ObservacionGeneral string               `gorm:"type:text" json:"observacion_general,omitempty"`
-	State              string               `gorm:"type:char(1);default:'A';not null" json:"state"`
-	Respuestas         []HistoriaRespuesta  `gorm:"foreignKey:HistoriaID" json:"respuestas,omitempty"`
+	ID                 uint                `gorm:"primaryKey;autoIncrement" json:"id"`
+	PacienteID         uint                `gorm:"not null;index" json:"paciente_id"`
+	MedicoID           uint                `gorm:"not null;index" json:"medico_id"`
+	FormularioID       uint                `gorm:"not null;index" json:"formulario_id"`
+	Fecha              time.Time           `gorm:"not null" json:"fecha"`
+	ObservacionGeneral string              `gorm:"type:text" json:"observacion_general,omitempty"`
+	State              string              `gorm:"type:char(1);default:'A';not null" json:"state"`
+	Respuestas         []HistoriaRespuesta `gorm:"foreignKey:HistoriaID" json:"respuestas,omitempty"`
 }
 
 func (HistoriaClinica) TableName() string { return "historias_clinicas" }
@@ -121,12 +121,20 @@ type PacienteImagen struct {
 	MedicoID      *uint     `gorm:"index" json:"medico_id,omitempty"`
 	NombreArchivo string    `gorm:"size:255;not null" json:"nombre_archivo"`
 	UrlArchivo    string    `gorm:"size:500;not null" json:"url_archivo"`
-	TipoImagen    int       `gorm:"not null;default:1" json:"tipo_imagen"`
+	TipoImagen    *uint     `gorm:"not null;index" json:"tipo_id"`
 	Descripcion   string    `gorm:"size:255" json:"descripcion,omitempty"`
 	CreadoEn      time.Time `gorm:"autoCreateTime;column:creado_en" json:"creado_en"`
 }
 
 func (PacienteImagen) TableName() string { return "paciente_imagenes" }
+
+type TipoImagenPaciente struct {
+	ID       uint   `gorm:"primaryKey;autoIncrement" json:"id"`
+	MedicoID *uint  `gorm:"index" json:"medico_id,omitempty"`
+	Tipo     string `gorm:"size:255;not null" json:"nombre_archivo"`
+}
+
+func (TipoImagenPaciente) TableName() string { return "tipo_paciente_imagenes" }
 
 type PacienteCertificado struct {
 	ID            uint      `gorm:"primaryKey;autoIncrement" json:"id"`

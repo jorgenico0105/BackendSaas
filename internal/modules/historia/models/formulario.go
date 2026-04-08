@@ -5,16 +5,16 @@ import "time"
 // ─── Formularios dinámicos ─────────────────────────────────────────────────────
 
 type Formulario struct {
-	ID               uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	Nombre           string    `gorm:"size:150;not null" json:"nombre"`
-	Descripcion      string    `gorm:"size:255" json:"descripcion,omitempty"`
-	ProfesionID      *uint     `gorm:"index" json:"profesion_id,omitempty"`
-	ClinicaID        *uint     `gorm:"index" json:"clinica_id,omitempty"`
-	UsuarioID        uint      `gorm:"not null;index" json:"usuario_id"`
-	TipoFormularioID uint      `gorm:"not null;index" json:"tipo_formulario_id"`
-	State            string    `gorm:"type:char(1);default:'A';not null" json:"state"`
-	CreadoEn         time.Time `gorm:"autoCreateTime;column:creado_en" json:"creado_en"`
-	Preguntas        []FormularioPregunta
+	ID               uint                 `gorm:"primaryKey;autoIncrement" json:"id"`
+	Nombre           string               `gorm:"size:150;not null" json:"nombre"`
+	Descripcion      string               `gorm:"size:255" json:"descripcion,omitempty"`
+	ProfesionID      *uint                `gorm:"index" json:"profesion_id,omitempty"`
+	ClinicaID        *uint                `gorm:"index" json:"clinica_id,omitempty"`
+	UsuarioID        uint                 `gorm:"not null;index" json:"usuario_id"`
+	TipoFormularioID uint                 `gorm:"not null;index" json:"tipo_formulario_id"`
+	State            string               `gorm:"type:char(1);default:'A';not null" json:"state"`
+	CreadoEn         time.Time            `gorm:"autoCreateTime;column:creado_en" json:"creado_en"`
+	Preguntas        []FormularioPregunta `gorm:"foreignKey:FormularioID" json:"preguntas,omitempty"`
 }
 
 func (Formulario) TableName() string { return "formularios" }
@@ -42,7 +42,7 @@ type FormularioPregunta struct {
 	MinVal        *float64           `gorm:"type:decimal(10,2)" json:"min_val,omitempty"`
 	MaxVal        *float64           `gorm:"type:decimal(10,2)" json:"max_val,omitempty"`
 	PermiteMulti  bool               `gorm:"default:false" json:"permite_multi"`
-	Opciones      []FormularioOpcion `gorm:"foreignKey:PreguntaID"`
+	Opciones      []FormularioOpcion `gorm:"foreignKey:PreguntaID" json:"opciones,omitempty"`
 }
 
 func (FormularioPregunta) TableName() string { return "formulario_preguntas" }
@@ -58,3 +58,12 @@ type FormularioOpcion struct {
 }
 
 func (FormularioOpcion) TableName() string { return "formulario_opciones" }
+
+type FormularioCita struct {
+	ID           uint        `gorm:"primaryKey;autoIncrement" json:"id"`
+	FormularioID uint        `gorm:"not null;uniqueIndex:udx_form_tipocita" json:"formulario_id"`
+	TipoCitaID   uint        `gorm:"not null;uniqueIndex:udx_form_tipocita" json:"tipo_cita_id"`
+	Formulario   *Formulario `gorm:"foreignKey:FormularioID" json:"formulario,omitempty"`
+}
+
+func (FormularioCita) TableName() string { return "formulario_cita" }

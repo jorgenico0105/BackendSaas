@@ -89,7 +89,7 @@ func RunMigrations() {
 
 	// 6. Historia clínica — catálogos y formularios dinámicos
 	if err := db.AutoMigrate(
-		&historiaModels.TipoFormulario{},
+		&historiaModels.FormularioCita{},
 		// &historiaModels.AlergiaCatalogo{},
 		// &historiaModels.TipoAntecedente{},
 		// &historiaModels.HabitoCatalogo{},
@@ -103,8 +103,8 @@ func RunMigrations() {
 	}
 
 	// 7. Historia clínica — registros del paciente
-	// if err := db.AutoMigrate(
-	// 	&historiaModels.HistoriaClinica{},
+	if err := db.AutoMigrate(
+		&historiaModels.TipoImagenPaciente{},
 	// 	&historiaModels.HistoriaRespuesta{},
 	// 	&historiaModels.PacienteAlergia{},
 	// 	&historiaModels.PacienteAntecedente{},
@@ -113,9 +113,9 @@ func RunMigrations() {
 	// 	&historiaModels.PacienteExamenResultado{},
 	// 	&historiaModels.PacienteImagen{},
 	// 	&historiaModels.PacienteCertificado{},
-	// ); err != nil {
-	// 	log.Fatal("Migration failed (historia - paciente):", err)
-	// }
+	); err != nil {
+		log.Fatal("Migration failed (historia - paciente):", err)
+	}
 
 	// 8. Tests psicológicos
 	// if err := db.AutoMigrate(
@@ -131,7 +131,8 @@ func RunMigrations() {
 
 	// 9. Nutrición — catálogos (sin FK a otras tablas)
 	if err := db.AutoMigrate(
-		&nutricionModels.NutricionMenuPlantilla{},
+		//&nutricionModels.NutricionMenuPlantilla{},
+		&nutricionModels.NutricionMenuDetalle{},
 		// 	&nutricionModels.NutricionTipoComida{},
 		// 	&nutricionModels.NutricionGrupoAlimento{}, // debe ir antes de NutricionAlimento (FK)
 		//&nutricionModels.NutricionAlimento{},
