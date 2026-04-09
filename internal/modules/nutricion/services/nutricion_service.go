@@ -1067,6 +1067,10 @@ func (s *NutricionService) AddDetalleMenu(menuID uint, req models.AddDetalleMenu
 	return d, nil
 }
 
+func (s *NutricionService) UpdateDetalleReceta(detalleID uint, receta string) (*models.NutricionMenuDetalle, error) {
+	return s.repo.UpdateDetalleReceta(detalleID, receta)
+}
+
 func (s *NutricionService) GetAlimentosMenuDetalle(detalleID uint) ([]models.NutricionMenuAlimento, error) {
 	return s.repo.FindAlimentosByMenuDetalle(detalleID)
 }

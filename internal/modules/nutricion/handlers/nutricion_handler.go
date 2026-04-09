@@ -237,6 +237,24 @@ func (h *NutricionHandler) AddDetalleMenu(c *gin.Context) {
 	responses.Created(c, "Detalle agregado", d)
 }
 
+func (h *NutricionHandler) UpdateDetalleMenu(c *gin.Context) {
+	detalleID, ok := paramUint(c, "detalleId")
+	if !ok {
+		return
+	}
+	var req models.UpdateDetalleMenuRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		responses.BadRequest(c, "Datos inválidos")
+		return
+	}
+	d, err := h.svc.UpdateDetalleReceta(detalleID, req.NombreReceta)
+	if err != nil {
+		responses.NotFound(c, "Detalle no encontrado")
+		return
+	}
+	responses.Success(c, "Receta actualizada", d)
+}
+
 func (h *NutricionHandler) ListMenusByDieta(c *gin.Context) {
 	dietaID, ok := paramUint(c, "dietaId")
 	if !ok {

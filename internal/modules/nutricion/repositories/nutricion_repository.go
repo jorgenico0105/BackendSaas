@@ -122,6 +122,18 @@ func (r *NutricionRepository) CreateDetalle(d *models.NutricionMenuDetalle) erro
 	return r.db.Create(d).Error
 }
 
+func (r *NutricionRepository) UpdateDetalleReceta(id uint, receta string) (*models.NutricionMenuDetalle, error) {
+	var d models.NutricionMenuDetalle
+	if err := r.db.First(&d, "id = ? AND state = 'A'", id).Error; err != nil {
+		return nil, err
+	}
+	d.NombreReceta = receta
+	if err := r.db.Save(&d).Error; err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
 func (r *NutricionRepository) DeleteDetalle(id uint) error {
 	return r.db.Model(&models.NutricionMenuDetalle{}).
 		Where("id = ?", id).Update("state", "I").Error

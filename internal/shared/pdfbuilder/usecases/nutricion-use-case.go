@@ -27,6 +27,7 @@ type MenuPdf struct {
 }
 type ComidaAlimentos struct {
 	NombreComida string
+	NombreReceta string
 	Alimentos    []models.NutricionMenuAlimento
 }
 
@@ -44,6 +45,7 @@ func (mpdf *MenuPdf) CreatePdf() error {
 	for _, detalle := range mpdf.Menu.Detalles {
 		diaMap[detalle.DiaNúmero] = append(diaMap[detalle.DiaNúmero], &ComidaAlimentos{
 			NombreComida: detalle.NombreComida,
+			NombreReceta: detalle.NombreReceta,
 			Alimentos:    detalle.Alimentos,
 		})
 	}
@@ -212,6 +214,19 @@ func getAlimetosContent(ca *ComidaAlimentos) []core.Row {
 				Left:  3,
 			}).WithStyle(&props.Cell{BorderType: border.Full}),
 		),
+	}
+
+	// Recipe name row (only if set)
+	if ca.NombreReceta != "" {
+		rows = append(rows, row.New(5).Add(
+			col.New(1),
+			text.NewCol(11, "Receta: "+ca.NombreReceta, props.Text{
+				Size:  8,
+				Style: fontstyle.Italic,
+				Top:   1,
+				Left:  3,
+			}).WithStyle(&props.Cell{BorderType: border.Full}),
+		))
 	}
 
 	for _, alimento := range ca.Alimentos {

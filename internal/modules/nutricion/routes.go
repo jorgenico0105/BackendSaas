@@ -76,6 +76,7 @@ func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMidd
 			// Alimentos de un detalle de menú
 			pac.GET("/menu-detalles/:detalleId/alimentos", h.GetAlimentosMenuDetalle)
 			pac.POST("/menu-detalles/:detalleId/alimentos", h.AddAlimentoMenuDetalle)
+			pac.PATCH("/menu-detalles/:detalleId", h.UpdateDetalleMenu)
 			pac.DELETE("/menu-detalles/:detalleId/alimentos/:id", h.DeleteAlimentoMenuDetalle)
 			pac.PUT("/menu-detalles/:detalleId/alimentos/:id", h.UpdateAlimentoMenuDetalle)
 

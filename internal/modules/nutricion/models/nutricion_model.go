@@ -616,6 +616,10 @@ type AddDetalleMenuRequest struct {
 	Instrucciones string `json:"instrucciones"`
 }
 
+type UpdateDetalleMenuRequest struct {
+	NombreReceta string `json:"nombre_receta"`
+}
+
 type AddAlimentoMenuRequest struct {
 	AlimentoID      uint    `json:"alimento_id" binding:"required"`
 	GramosAsignados float64 `json:"gramos_asignados" binding:"required,gt=0"`
