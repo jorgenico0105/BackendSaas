@@ -103,6 +103,9 @@ type NutricionAlimento struct {
 	MediaTardeMana   bool                    `gorm:"type:bool" json:"media_tarde_mana,omitempty"`
 	Almuerzo         bool                    `gorm:"type:bool" json:"almuerzo,omitempty"`
 	Merienda         bool                    `gorm:"type:bool" json:"merienda,omitempty"`
+	NeedUnidad       bool                    `gorm:"type:bool" json:"unidad,omitempty"`
+	GramosUnidad     *float64                `gorm:"type:decimal(8,2)" json:"gramos_unidad,omitempty"`
+	Medida           string                  `gorm:"size:255" json:"medida,omitempty"`
 }
 
 func (NutricionAlimento) TableName() string { return "nutricion_alimentos" }
@@ -235,7 +238,7 @@ type NutricionMenuAlimento struct {
 	Observacion        string            `gorm:"size:255" json:"observacion,omitempty"`
 	State              string            `gorm:"type:char(1);default:'A';not null" json:"state"`
 	CreadoEn           time.Time         `gorm:"autoCreateTime;column:creado_en" json:"creado_en"`
-	Alimento           NutricionAlimento `gorm:"foreignKey:AlimentoID"`
+	Alimento           NutricionAlimento `gorm:"foreignKey:AlimentoID" json:"Alimento"`
 }
 
 func (NutricionMenuAlimento) TableName() string { return "nutricion_menu_alimentos" }
@@ -552,6 +555,9 @@ type CreateAlimentoRequest struct {
 	MediaTardeMana bool     `json:"media_tarde_mana"`
 	Almuerzo       bool     `json:"almuerzo"`
 	Merienda       bool     `json:"merienda"`
+	NeedUnidad     bool     `json:"unidad"`
+	GramosUnidad   *float64 `json:"gramos_unidad"`
+	Medida         string   `json:"medida"`
 }
 
 type UpdateAlimentoRequest struct {
@@ -570,6 +576,9 @@ type UpdateAlimentoRequest struct {
 	MediaTardeMana bool     `json:"media_tarde_mana"`
 	Almuerzo       bool     `json:"almuerzo"`
 	Merienda       bool     `json:"merienda"`
+	NeedUnidad     bool     `json:"unidad"`
+	GramosUnidad   *float64 `json:"gramos_unidad"`
+	Medida         string   `json:"medida"`
 }
 
 type CreateDietaRequest struct {

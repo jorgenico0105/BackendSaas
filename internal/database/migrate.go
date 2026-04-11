@@ -132,10 +132,10 @@ func RunMigrations() {
 	// 9. Nutrición — catálogos (sin FK a otras tablas)
 	if err := db.AutoMigrate(
 		//&nutricionModels.NutricionMenuPlantilla{},
-		&nutricionModels.NutricionMenuDetalle{},
+		//&nutricionModels.NutricionMenuDetalle{},
 		// 	&nutricionModels.NutricionTipoComida{},
 		// 	&nutricionModels.NutricionGrupoAlimento{}, // debe ir antes de NutricionAlimento (FK)
-		//&nutricionModels.NutricionAlimento{},
+		&nutricionModels.NutricionAlimento{},
 		//&nutricionModels.NutricionTipoComidaGrupo{},
 		//&nutricionModels.NutricionTipoRecurso{},
 		//&nutricionModels.NutricionArchivoPDF{},

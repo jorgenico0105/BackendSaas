@@ -91,6 +91,9 @@ func (s *NutricionService) CreateAlimento(req models.CreateAlimentoRequest, crea
 		MediaTardeMana: req.MediaTardeMana,
 		Almuerzo:       req.Almuerzo,
 		Merienda:       req.Merienda,
+		NeedUnidad:     req.NeedUnidad,
+		GramosUnidad:   req.GramosUnidad,
+		Medida:         req.Medida,
 		State:          "A",
 		CreadoPor:      &creadoPor,
 	}
@@ -124,6 +127,9 @@ func (s *NutricionService) UpdateAlimento(id uint, req models.UpdateAlimentoRequ
 	a.MediaTardeMana = req.MediaTardeMana
 	a.Almuerzo = req.Almuerzo
 	a.Merienda = req.Merienda
+	a.NeedUnidad = req.NeedUnidad
+	a.GramosUnidad = req.GramosUnidad
+	a.Medida = req.Medida
 	if err := s.repo.UpdateAlimento(a); err != nil {
 		return nil, err
 	}
