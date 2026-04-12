@@ -27,6 +27,12 @@ func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMidd
 	{
 		n.GET("/generate-menu-pdf/:menuID", h.CreateMenuReport)
 		// ─── Catálogos ─────────────────────────────────────────────────
+		n.GET("/grupos-alimento", h.ListGruposAlimento)
+		n.GET("/grupos-alimento/:id", h.GetGrupoAlimento)
+		n.POST("/grupos-alimento", h.CreateGrupoAlimento)
+		n.PUT("/grupos-alimento/:id", h.UpdateGrupoAlimento)
+		n.DELETE("/grupos-alimento/:id", h.DeleteGrupoAlimento)
+
 		n.GET("/alimentos", h.ListAlimentos)
 		n.GET("/alimentos/:id", h.GetAlimento)
 		n.POST("/alimentos", h.CreateAlimento)

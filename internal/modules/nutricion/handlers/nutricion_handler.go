@@ -63,6 +63,74 @@ func (h *NutricionHandler) CreateMenuReport(c *gin.Context) {
 	c.File(outputPath)
 }
 
+// ─── Grupos de alimento ───────────────────────────────────────────────────────
+
+func (h *NutricionHandler) ListGruposAlimento(c *gin.Context) {
+	list, err := h.svc.ListGruposAlimento()
+	if err != nil {
+		responses.InternalError(c, "Error al listar grupos de alimento")
+		return
+	}
+	responses.Success(c, "Grupos de alimento", list)
+}
+
+func (h *NutricionHandler) GetGrupoAlimento(c *gin.Context) {
+	id, ok := paramUint(c, "id")
+	if !ok {
+		return
+	}
+	g, err := h.svc.GetGrupoAlimento(id)
+	if err != nil {
+		responses.NotFound(c, "Grupo de alimento no encontrado")
+		return
+	}
+	responses.Success(c, "Grupo de alimento", g)
+}
+
+func (h *NutricionHandler) CreateGrupoAlimento(c *gin.Context) {
+	var req models.CreateGrupoAlimentoRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		responses.BadRequest(c, "Datos inválidos")
+		return
+	}
+	g, err := h.svc.CreateGrupoAlimento(req)
+	if err != nil {
+		responses.InternalError(c, "Error al crear grupo de alimento")
+		return
+	}
+	responses.Created(c, "Grupo de alimento creado", g)
+}
+
+func (h *NutricionHandler) UpdateGrupoAlimento(c *gin.Context) {
+	id, ok := paramUint(c, "id")
+	if !ok {
+		return
+	}
+	var req models.UpdateGrupoAlimentoRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		responses.BadRequest(c, "Datos inválidos")
+		return
+	}
+	g, err := h.svc.UpdateGrupoAlimento(id, req)
+	if err != nil {
+		responses.NotFound(c, "Grupo de alimento no encontrado")
+		return
+	}
+	responses.Success(c, "Grupo de alimento actualizado", g)
+}
+
+func (h *NutricionHandler) DeleteGrupoAlimento(c *gin.Context) {
+	id, ok := paramUint(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.svc.DeleteGrupoAlimento(id); err != nil {
+		responses.NotFound(c, "Grupo de alimento no encontrado")
+		return
+	}
+	responses.Success(c, "Grupo de alimento eliminado", nil)
+}
+
 // ─── Alimentos ────────────────────────────────────────────────────────────────
 
 func (h *NutricionHandler) ListAlimentos(c *gin.Context) {

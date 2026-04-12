@@ -157,6 +157,29 @@ uploads.DeleteFile(result.FilePath)
 
 Archivos estáticos servidos en `/storage` → `./storage` (configurado en `main.go`).
 
+**Generación de PDFs — dos sistemas:**
+
+1. `internal/shared/pdfbuilder/` — PDFs por código con `maroto/v2` (Poppins font, logo watermark). Implementar la interfaz `UseCase` en `pdfbuilder/usecases/` para cada tipo de documento (ejemplo: `nutricion-use-case.go` genera el PDF del menú semanal).
+```go
+m, err := pdfSvc.GeneratePdfBuilder()   // obtiene core.Maroto configurado
+uc := usecases.NewMenuPdfUseCase(dieta, menu, m, logoPath, outputPath)
+uc.CreatePdf()
+```
+
+2. `internal/shared/reports/` — Reportes desde templates `.jasper` vía binario `jasper-starter`. Templates en `resources/jasper_templates/`, salida en `storage/reports/`.
+```go
+jasperSvc := reports.NewJasperService(jasperPath, jdbcPath, host, port, db, user, pass)
+outPath, err := jasperSvc.GenerateReport(reports.ReportParams{
+    TemplateName: "nombre_template",   // sin extensión
+    OutputName:   "archivo_salida",
+    Format:       reports.FormatPDF,
+    Parameters:   map[string]interface{}{"clinica_id": 1},
+})
+reports.DeleteReport(outPath)   // limpiar después de servir
+```
+
+**OpenAI / Conversaciones IA** (`internal/shared/openia/`): el historial de chat por paciente se almacena en Redis con clave `conv:<paciente_id>` (helper `openia.BuildConversationKey(pacienteID)`). El servicio se instancia una sola vez en `main.go` y se pasa a `nutricion.RegisterRoutes`.
+
 ### Agregar nuevos módulos
 
 1. Crear `internal/modules/nuevo_modulo/` con la estructura estándar.

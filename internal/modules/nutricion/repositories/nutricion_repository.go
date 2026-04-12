@@ -16,6 +16,34 @@ func NewNutricionRepository(db *gorm.DB) *NutricionRepository {
 	return &NutricionRepository{db: db}
 }
 
+// ─── Grupos de alimento ───────────────────────────────────────────────────────
+
+func (r *NutricionRepository) FindGruposAlimento() ([]models.NutricionGrupoAlimento, error) {
+	var list []models.NutricionGrupoAlimento
+	err := r.db.Where("state = 'A'").Order("orden ASC, nombre ASC").Find(&list).Error
+	return list, err
+}
+
+func (r *NutricionRepository) FindGrupoAlimentoByID(id uint) (*models.NutricionGrupoAlimento, error) {
+	var g models.NutricionGrupoAlimento
+	err := r.db.First(&g, "id = ? AND state = 'A'", id).Error
+	return &g, err
+}
+
+func (r *NutricionRepository) CreateGrupoAlimento(g *models.NutricionGrupoAlimento) error {
+	return r.db.Create(g).Error
+}
+
+func (r *NutricionRepository) UpdateGrupoAlimento(g *models.NutricionGrupoAlimento) error {
+	return r.db.Save(g).Error
+}
+
+func (r *NutricionRepository) DeleteGrupoAlimento(id uint) error {
+	return r.db.Model(&models.NutricionGrupoAlimento{}).
+		Where("id = ?", id).
+		Update("state", "I").Error
+}
+
 // ─── Alimentos ────────────────────────────────────────────────────────────────
 type DatosRequerimeintos struct {
 	ID              uint

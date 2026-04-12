@@ -56,6 +56,50 @@ func (s *NutricionService) DeactivateOldMenus(ctx context.Context) {
 	s.repo.DesactivarMenusAnitguos()
 }
 
+// ─── Grupos de alimento ───────────────────────────────────────────────────────
+
+func (s *NutricionService) ListGruposAlimento() ([]models.NutricionGrupoAlimento, error) {
+	return s.repo.FindGruposAlimento()
+}
+
+func (s *NutricionService) GetGrupoAlimento(id uint) (*models.NutricionGrupoAlimento, error) {
+	return s.repo.FindGrupoAlimentoByID(id)
+}
+
+func (s *NutricionService) CreateGrupoAlimento(req models.CreateGrupoAlimentoRequest) (*models.NutricionGrupoAlimento, error) {
+	g := &models.NutricionGrupoAlimento{
+		Codigo:      req.Codigo,
+		Nombre:      req.Nombre,
+		Descripcion: req.Descripcion,
+		Icono:       req.Icono,
+		Orden:       req.Orden,
+		State:       "A",
+	}
+	if err := s.repo.CreateGrupoAlimento(g); err != nil {
+		return nil, err
+	}
+	return g, nil
+}
+
+func (s *NutricionService) UpdateGrupoAlimento(id uint, req models.UpdateGrupoAlimentoRequest) (*models.NutricionGrupoAlimento, error) {
+	g, err := s.repo.FindGrupoAlimentoByID(id)
+	if err != nil {
+		return nil, err
+	}
+	g.Nombre = req.Nombre
+	g.Descripcion = req.Descripcion
+	g.Icono = req.Icono
+	g.Orden = req.Orden
+	if err := s.repo.UpdateGrupoAlimento(g); err != nil {
+		return nil, err
+	}
+	return g, nil
+}
+
+func (s *NutricionService) DeleteGrupoAlimento(id uint) error {
+	return s.repo.DeleteGrupoAlimento(id)
+}
+
 // ─── Alimentos ────────────────────────────────────────────────────────────────
 
 func (s *NutricionService) ListAlimentos(categoria string) ([]models.NutricionAlimento, error) {
@@ -78,6 +122,7 @@ func (s *NutricionService) CreateAlimento(req models.CreateAlimentoRequest, crea
 	a := &models.NutricionAlimento{
 		Nombre:         req.Nombre,
 		Descripcion:    req.Descripcion,
+		GrupoID:        req.GrupoID,
 		Categoria:      req.Categoria,
 		GramosPorcion:  porcion,
 		Calorias:       req.Calorias,
@@ -114,6 +159,7 @@ func (s *NutricionService) UpdateAlimento(id uint, req models.UpdateAlimentoRequ
 	}
 	a.Nombre = req.Nombre
 	a.Descripcion = req.Descripcion
+	a.GrupoID = req.GrupoID
 	a.Categoria = req.Categoria
 	a.GramosPorcion = porcion
 	a.Calorias = req.Calorias

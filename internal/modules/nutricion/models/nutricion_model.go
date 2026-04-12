@@ -539,9 +539,25 @@ func (NutricionPacienteXP) TableName() string { return "nutricion_paciente_xp" }
 
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
+type CreateGrupoAlimentoRequest struct {
+	Codigo      string `json:"codigo" binding:"required,min=2,max=30"`
+	Nombre      string `json:"nombre" binding:"required,min=2,max=80"`
+	Descripcion string `json:"descripcion"`
+	Icono       string `json:"icono"`
+	Orden       int    `json:"orden"`
+}
+
+type UpdateGrupoAlimentoRequest struct {
+	Nombre      string `json:"nombre" binding:"required,min=2,max=80"`
+	Descripcion string `json:"descripcion"`
+	Icono       string `json:"icono"`
+	Orden       int    `json:"orden"`
+}
+
 type CreateAlimentoRequest struct {
 	Nombre         string   `json:"nombre" binding:"required,min=2,max=150"`
 	Descripcion    string   `json:"descripcion"`
+	GrupoID        *uint    `json:"grupo_id"`
 	Categoria      string   `json:"categoria"`
 	GramosPorcion  float64  `json:"gramos_porcion"`
 	Calorias       float64  `json:"calorias" binding:"required"`
@@ -563,6 +579,7 @@ type CreateAlimentoRequest struct {
 type UpdateAlimentoRequest struct {
 	Nombre         string   `json:"nombre" binding:"required,min=2,max=150"`
 	Descripcion    string   `json:"descripcion"`
+	GrupoID        *uint    `json:"grupo_id"`
 	Categoria      string   `json:"categoria"`
 	GramosPorcion  float64  `json:"gramos_porcion"`
 	Calorias       float64  `json:"calorias" binding:"required"`
