@@ -4,33 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SaaS Médico - Backend API para una plataforma SaaS médica multi-clínica. Un usuario (profesional de salud) puede pertenecer a una o más clínicas; los pacientes pertenecen a la clínica. Soporta múltiples especialidades médicas.
+SaaS Médico — Backend API para una plataforma SaaS médica multi-clínica. Un usuario (profesional de salud) puede pertenecer a una o más clínicas; los pacientes pertenecen a la clínica. Soporta múltiples especialidades médicas.
 
-**Tech Stack:** Go 1.24 · Gin · GORM · MySQL 8 · JWT (`golang-jwt/jwt/v5`) · Redis · OpenAI (`gpt-5.4` vía `openai-go/v3`) · Jasper Reports (binario externo)
+**Tech Stack:** Go 1.26 · Gin · GORM · MySQL 8 · JWT (`golang-jwt/jwt/v5`) · Redis · OpenAI (`openai-go/v3`) · Jasper Reports (binario externo) · maroto/v2 (PDF)
 
 ## Common Commands
 
 ```bash
-# Ejecutar la aplicación
-go run cmd/api/main.go
-
-# Hot reload (requiere air instalado)
-air
-
-# Build
+go run cmd/api/main.go          # Start API (port from .env SERVER_PORT)
+air                             # Hot reload
 go build -o bin/api cmd/api/main.go
-
-# Dependencias
 go mod tidy
-
-# Tests
 go test ./...
-go test ./internal/modules/auth/...   # módulo específico
+go test ./internal/modules/auth/...   # Single module tests
 
-# Seed de catálogos de nutrición (idempotente)
+# Seed data (idempotent)
 go run cmd/seed/main.go
-
-# Seed de agenda y menú del sistema (correr una vez contra la BD)
 mysql -u$DB_USER -p$DB_PASSWORD $DB_NAME < resources/seed_agenda.sql
 mysql -u$DB_USER -p$DB_PASSWORD $DB_NAME < resources/seed_menu.sql
 ```
@@ -39,74 +28,80 @@ Health check: `GET /ping` → `{"message":"pong","status":"healthy"}`
 
 ## Architecture
 
-### Módulos actuales
+### Module layout
 
 ```
 internal/modules/
 ├── auth/          # JWT auth, usuarios, roles, permisos, refresh tokens
-├── admin/         # Clínicas, sucursales, consultorios, profesiones, roles de transacción, planes SaaS, suscripciones
+├── admin/         # Clínicas, sucursales, consultorios, profesiones, planes SaaS, suscripciones
 ├── pacientes/     # Pacientes, pre-pacientes, aplicaciones
-├── agenda/        # Citas, sesiones, horarios médico, bloqueos de agenda
+├── agenda/        # Citas, sesiones, horarios médico, bloqueos
 ├── cobros/        # Cobros por sesión, pagos, egresos
-├── historia/      # Historia clínica, formularios dinámicos, alergias, antecedentes, diagnósticos
+├── historia/      # Historia clínica, formularios dinámicos, alergias, diagnósticos
 ├── tests/         # Tests psicológicos, reglas de puntaje, sesiones de test
-├── nutricion/     # Planes de dieta, menús, alimentos, ejercicios, progreso, gamificación (XP/logros)
-├── psicologia/    # [stub] listo para expandir
-└── odontologia/   # [stub] listo para expandir
+├── nutricion/     # Planes de dieta, menús, alimentos, ejercicios, progreso, XP/logros
+├── psicologia/    # [stub]
+└── odontologia/   # [stub]
 ```
 
-### Estructura de cada módulo
-
+Each module follows this structure:
 ```
 module_name/
-├── handlers/      # HTTP handlers — parsea request, llama service, retorna response
-├── services/      # Lógica de negocio
-├── repositories/  # Acceso a datos GORM
-├── models/        # Modelos GORM + DTOs (en archivos separados)
-└── routes.go      # Instancia repo→service→handler y registra rutas
+├── handlers/      # Parse request → call service → return response
+├── services/      # Business logic
+├── repositories/  # GORM data access
+├── models/        # GORM models + DTOs (separate files)
+└── routes.go      # DI: repo→service→handler, route registration
 ```
 
-La inyección de dependencias ocurre **dentro de `routes.go`**: cada `RegisterRoutes` instancia su propio repo, service y handler usando `database.GetDB()`.
+DI happens **inside `routes.go`** via `database.GetDB()`. No global service singletons.
 
-### Orden de inicio (`cmd/api/main.go`)
+### Startup order (`cmd/api/main.go`)
 
 ```
-config.LoadConfig() → database.Connect() → [RunMigrations() — comentado] → redis.NewClient() → auth.Setup() → register routes → router.Run()
+config.LoadConfig() → database.Connect() → redis.NewClient() → auth.Setup() → register routes → router.Run()
 ```
 
-`auth.Setup()` debe llamarse antes de `auth.GetAuthMiddleware()`. `database.RunMigrations()` está **comentado por defecto** en `main.go`; descoméntalo solo cuando necesites correr migraciones, luego vuélvelo a comentar.
+- `auth.Setup()` must be called before `auth.GetAuthMiddleware()`.
+- `database.RunMigrations()` is **commented out** by default — uncomment only when needed, then re-comment.
+- Redis is **hardcoded** in `main.go` (`162.243.161.156:6379`, password `nico1234.`); `REDIS_ADDR` from `.env` is not used.
+- Server binds on `":" + port` (all interfaces), not localhost-only.
 
-**Redis:** la dirección está hardcodeada en `main.go` (`162.243.161.156:6379`), no lee `REDIS_ADDR` del `.env`.
+### RegisterRoutes signatures
 
-**OpenAI:** inicializado en `internal/shared/openia/openia.go` usando `openai-go/v3`. El servicio se pasa a `nutricion.RegisterRoutes`. El modelo usado es `gpt-5.4`.
+```go
+// Most modules
+RegisterRoutes(api *gin.RouterGroup, authMiddleware *middleware.AuthMiddleware)
 
-**Scheduler:** `internal/shared/scheduler/scheduler.go` — `StartCron(job JobFunc)` ejecuta el job diariamente a medianoche (zona `America/Guayaquil`). Se llama desde `nutricion.RegisterRoutes` para desactivar menús viejos.
+// Nutrición (extended — needs Redis + OpenAI)
+RegisterRoutes(api, authMiddleware, rdb *redis.Client, openiaService *openia.OpenIaService)
+```
 
-### Convenciones de modelos
+## Model Conventions
 
-- **IDs:** `uint` con `autoIncrement` en todos los modelos (no UUID)
-- **Soft delete:** campo `State string` con `char(1)` — `'A'` activo, `'I'` inactivo. No se usa `gorm.DeletedAt`. Constantes `models.StateActivo` / `models.StateInactivo` en `internal/shared/models/base.go`.
-- **Base struct:** `internal/shared/models/base.go` expone `Base` (ID + State + CreadoEn + ActualizadoEn). Los nuevos modelos pueden embeber `Base` o definir los campos directamente.
-- **Timestamps:** `CreadoEn`/`ActualizadoEn` con `gorm:"autoCreateTime/autoUpdateTime"`. Los modelos de auth usan `CreatedAt`/`UpdatedAt` (convención GORM estándar).
-- **Queries:** siempre filtrar `WHERE state = 'A'` en listas. Soft delete → `UPDATE SET state = 'I'`.
-- **TableName():** añadir cuando el plural GORM no coincide con el esquema (ej: `Rol` → `roles`, `HorarioMedico` → `horarios_medico`).
-- **Dos campos de estado:** algunos modelos usan `State char(1)` (activo/inactivo de registro) **y** `Estado string` (estado de negocio como `ACTIVA/COMPLETADA/CANCELADA`). No confundirlos.
+- **IDs:** `uint` with `autoIncrement` (no UUID).
+- **Soft delete:** `State string` `char(1)` — `'A'` active, `'I'` inactive. No `gorm.DeletedAt`. Use constants `models.StateActivo` / `models.StateInactivo` (`internal/shared/models/base.go`).
+- **Base struct:** embed `Base` from `internal/shared/models/base.go` (ID + State + CreadoEn + ActualizadoEn) or define fields directly.
+- **Timestamps:** `CreadoEn`/`ActualizadoEn` with `gorm:"autoCreateTime/autoUpdateTime"`. Auth models use `CreatedAt`/`UpdatedAt` (standard GORM).
+- **Queries:** always filter `WHERE state = 'A'` in list queries. Soft delete → `UPDATE SET state = 'I'`.
+- **TableName():** add whenever GORM's plural doesn't match the schema (e.g. `Rol` → `roles`).
+- **Two status fields:** some models have both `State char(1)` (record active/inactive) **and** `Estado string` (business state like `ACTIVA/COMPLETADA/CANCELADA`). Don't conflate them.
 
-### Autenticación
+## Authentication
 
 **Staff (profesionales/admin):**
-- Tokens JWT con `UserID uint`. Claims en contexto Gin: `userID`, `clinicaID`, `email`, `rolID`, `rolName`, `permisos`.
-- Los handlers recuperan el user con `c.GetUint("userID")` y la clínica activa con `c.GetUint("clinicaID")`.
-- Constantes de roles en `internal/modules/auth/models/rol.go` (`models.RolSuperAdmin`, `models.RolAdmin`, etc.).
-- Refresh token rotation: el token actual se revoca en cada `/refresh`, logout y cambio de contraseña.
-- Login en dos pasos: primer POST devuelve clínicas disponibles, segundo POST con `clinica_id` completa el login.
+- JWT claims in Gin context: `userID`, `clinicaID`, `email`, `rolID`, `rolName`, `permisos`.
+- Retrieve with `c.GetUint("userID")` and `c.GetUint("clinicaID")`.
+- Role constants in `internal/modules/auth/models/rol.go`.
+- Two-step login: first POST returns available clinics; second POST with `clinica_id` completes auth.
+- Refresh token rotation on every `/refresh`, logout, and password change.
 
-**Pacientes (app móvil):**
-- Sistema JWT separado con claims distintos: `user_id` → `paciente_id`, `rol_name` → `"paciente"`, más `clinica_id` y `aplicacion_id`.
-- Contraseña por defecto al crear paciente: `Usuario123`.
-- Ver `NUTRICION_PACIENTE_CONTEXT.md` para endpoints y contexto de la API de pacientes.
+**Pacientes (mobile app):**
+- Separate JWT system with claims: `user_id` → `paciente_id`, `rol_name` → `"paciente"`, plus `clinica_id` and `aplicacion_id`.
+- Default password on creation: `Usuario123`.
+- See `NUTRICION_PACIENTE_CONTEXT.md` for patient-facing endpoints.
 
-### Middleware
+## Middleware
 
 ```go
 router.Use(authMiddleware.RequireAuth())
@@ -115,17 +110,11 @@ router.Use(authMiddleware.RequirePermissions("psicologia.ver"))
 router.Use(authMiddleware.RequireAnyPermission("psicologia.ver", "nutricion.ver"))
 ```
 
-CORS se aplica globalmente en `internal/middleware/cors.go`. El módulo `historia` usa roles: `RolAdmin, RolNutriologo, RolPsicologo, RolSuperAdmin`.
+CORS applied globally in `internal/middleware/cors.go`.
 
-### Firma de RegisterRoutes
+## HTTP Responses
 
-La mayoría de módulos: `RegisterRoutes(api *gin.RouterGroup, authMiddleware *middleware.AuthMiddleware)`.
-
-Nutrición tiene firma extendida: `RegisterRoutes(api, authMiddleware, rdb *redis.Client, openiaService *openia.OpenIaService)`.
-
-### Respuestas HTTP
-
-Usar siempre `internal/shared/responses`:
+Always use `internal/shared/responses` — never raw `c.JSON`:
 
 ```go
 responses.Success(c, message, data)
@@ -138,85 +127,80 @@ responses.Forbidden(c, message)
 responses.InternalError(c, message)
 ```
 
-### Utilidades compartidas
+## Shared Utilities
 
-**Paginación** (`internal/shared/utils`):
+**Pagination** (`internal/shared/utils`):
 ```go
-page, pageSize := utils.GetPaginationParams(c)   // lee ?page= y ?page_size= (máx 100)
+page, pageSize := utils.GetPaginationParams(c)   // reads ?page= and ?page_size= (max 100)
 offset := utils.GetOffset(page, pageSize)
 ```
 
-**Subida de archivos** (`internal/shared/uploads`):
+**File uploads** (`internal/shared/uploads`):
 ```go
 result, err := uploads.SaveFile(c, fileHeader, "subdir", uploads.AllowedImageTypes)
-// Guarda en storage/uploads/<subdir>/. Límite: 10 MB.
-// AllowedImageTypes: .jpg .jpeg .png .gif .webp
-// AllowedDocTypes:   .pdf .doc .docx .xls .xlsx
+// Saves to storage/uploads/<subdir>/. Limit: 10 MB.
 uploads.DeleteFile(result.FilePath)
 ```
+Static files served at `/storage` → `./storage`.
 
-Archivos estáticos servidos en `/storage` → `./storage` (configurado en `main.go`).
+**PDF — two systems:**
 
-**Generación de PDFs — dos sistemas:**
-
-1. `internal/shared/pdfbuilder/` — PDFs por código con `maroto/v2` (Poppins font, logo watermark). Implementar la interfaz `UseCase` en `pdfbuilder/usecases/` para cada tipo de documento (ejemplo: `nutricion-use-case.go` genera el PDF del menú semanal).
+1. `internal/shared/pdfbuilder/` — code-generated PDFs with maroto/v2. Implement `UseCase` interface in `pdfbuilder/usecases/` per document type.
 ```go
-m, err := pdfSvc.GeneratePdfBuilder()   // obtiene core.Maroto configurado
+pdfS := pdfbuilder.NewPdfBuilder(watermarkPath)
+m, err := pdfS.GeneratePdfBuilder()
 uc := usecases.NewMenuPdfUseCase(dieta, menu, m, logoPath, outputPath)
 uc.CreatePdf()
 ```
 
-2. `internal/shared/reports/` — Reportes desde templates `.jasper` vía binario `jasper-starter`. Templates en `resources/jasper_templates/`, salida en `storage/reports/`.
+2. `internal/shared/reports/` — Jasper template reports via `jasper-starter` binary. Templates in `resources/jasper_templates/`, output in `storage/reports/`.
 ```go
 jasperSvc := reports.NewJasperService(jasperPath, jdbcPath, host, port, db, user, pass)
 outPath, err := jasperSvc.GenerateReport(reports.ReportParams{
-    TemplateName: "nombre_template",   // sin extensión
+    TemplateName: "nombre_template",
     OutputName:   "archivo_salida",
     Format:       reports.FormatPDF,
     Parameters:   map[string]interface{}{"clinica_id": 1},
 })
-reports.DeleteReport(outPath)   // limpiar después de servir
+reports.DeleteReport(outPath)
 ```
 
-**OpenAI / Conversaciones IA** (`internal/shared/openia/`): el historial de chat por paciente se almacena en Redis con clave `conv:<paciente_id>` (helper `openia.BuildConversationKey(pacienteID)`). El servicio se instancia una sola vez en `main.go` y se pasa a `nutricion.RegisterRoutes`.
+**OpenAI / Chat** (`internal/shared/openia/`): chat history per patient stored in Redis, key `conv:<paciente_id>` (use `openia.BuildConversationKey(pacienteID)`). Service instantiated once in `main.go`.
 
-### Agregar nuevos módulos
+**Scheduler** (`internal/shared/scheduler/`): `StartCron(job JobFunc)` runs daily at midnight `America/Guayaquil`. Called from `nutricion.RegisterRoutes` to deactivate old menus.
 
-1. Crear `internal/modules/nuevo_modulo/` con la estructura estándar.
-2. En `routes.go`: `func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMiddleware)`.
-3. Agregar los modelos a `internal/database/migrate.go` en el orden correcto de FKs.
-4. Registrar en `cmd/api/main.go`.
+## Migrations
 
-### Migraciones
+`internal/database/migrate.go` has `RunMigrations()` with groups commented per module. To migrate a new group, uncomment its block, run, then re-comment.
 
-`internal/database/migrate.go` define `RunMigrations()` con grupos comentados por módulo. Actualmente activos: `historiaModels.TipoFormulario{}` y `nutricionModels.NutricionMenuPlantilla{}`. Para migrar un nuevo grupo, descomenta el bloque correspondiente.
+Manual SQL migrations live in `resources/migrations/` and must be run directly against the DB.
 
-**SQL manuales:** `resources/migrations/` contiene migraciones SQL que deben correrse directamente. Ejemplo: `002_nutricion_menu_detalle.sql` renombra tablas de nutrición (`nutricion_dieta_detalle` → `nutricion_menu_detalle`).
+FK dependency order for AutoMigrate:
+1. Auth → 2. Admin → 3. Pacientes → 4. Agenda → 5. Cobros → 6. Historia (catálogos) → 7. Historia (registros) → 8. Tests → 9. Nutrición (catálogos) → 10. Nutrición (dieta/menú) → 11. Nutrición (registros/seguimiento)
 
-Orden de dependencias FK para GORM AutoMigrate:
-1. Auth → 2. Admin → 3. Pacientes → 4. Agenda → 5. Cobros → 6. Historia (catálogos/formularios) → 7. Historia (registros paciente) → 8. Tests psicológicos → 9. Nutrición (catálogos) → 10. Nutrición (dieta/menú) → 11. Nutrición (registros y seguimiento)
+## Configuration
 
-### Configuración
-
-Variables de entorno (`.env`):
+`.env` variables:
 ```
 DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
 SERVER_PORT, ENVIRONMENT
 JWT_SECRET, JWT_EXPIRATION_HOURS, JWT_REFRESH_DAYS
 OPEN_AI_API_KEY
-REDIS_ADDR        # actualmente ignorado — ver hardcode en main.go
 ```
 
-### Esquema completo de BD
+## Adding a New Module
 
-El esquema completo está en `SaasMedico_esquema_contexto.md`. Consultar al implementar nuevos módulos.
+1. Create `internal/modules/nuevo_modulo/` with the standard structure.
+2. In `routes.go`: `func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMiddleware)`.
+3. Add models to `internal/database/migrate.go` in FK order.
+4. Register in `cmd/api/main.go`.
 
-### Módulos pendientes de implementar
+## Pending Modules
 
-- **tratamiento/** — planes de tratamiento, items, cobros de plan
-- **odontologia/** — odontogramas, piezas, caras, eventos (expandir stub)
-- **psicologia/** — expandir stub (lógica de tests ya está en `tests/`)
-- **documentos/** — consentimientos, prescripciones
-- **tareas/** — tareas paciente, progreso diario, observaciones de sesión
-- **notificaciones/** — cola de notificaciones WhatsApp/SMS/email
-- **recursos/** — recursos psicoeducativos, plantillas de intervención
+- **tratamiento/** — treatment plans, items, plan billing
+- **odontologia/** — odontograms, teeth, faces, events (expand stub)
+- **psicologia/** — expand stub (test logic already in `tests/`)
+- **documentos/** — consents, prescriptions
+- **tareas/** — patient tasks, daily progress, session observations
+- **notificaciones/** — WhatsApp/SMS/email notification queue
+- **recursos/** — psychoeducational resources, intervention templates

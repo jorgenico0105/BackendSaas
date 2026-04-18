@@ -54,6 +54,26 @@ func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMidd
 		// ─── Especial: menús que requieren cambio mañana ───────────────
 		n.GET("/menus/requieren-cambio", h.ListDietasRequierenCambio)
 
+		// ─── Plantillas de menú semanal ────────────────────────────────
+		// Filtros: ?num_comidas=5  ?semana_numero=1
+		n.GET("/plantillas-menu", h.ListPlantillas)
+		n.POST("/plantillas-menu", h.CreatePlantillaSemana)
+		n.GET("/plantillas-menu/:plantillaId", h.GetPlantillaSemana)
+		n.PUT("/plantillas-menu/:plantillaId", h.UpdatePlantillaSemana)
+		n.DELETE("/plantillas-menu/:plantillaId", h.DeletePlantillaSemana)
+
+		// Detalles (día+comida) de una plantilla
+		n.GET("/plantillas-menu/:plantillaId/detalles", h.GetDetallesPlantilla)
+		n.POST("/plantillas-menu/:plantillaId/detalles", h.AddDetallePlantilla)
+		n.PUT("/plantillas-menu-detalles/:detalleId", h.UpdateDetallePlantilla)
+		n.DELETE("/plantillas-menu-detalles/:detalleId", h.DeleteDetallePlantilla)
+
+		// Alimentos de un detalle de plantilla
+		n.GET("/plantillas-menu-detalles/:detalleId/alimentos", h.GetAlimentosPlantillaDetalle)
+		n.POST("/plantillas-menu-detalles/:detalleId/alimentos", h.AddAlimentoPlantillaDetalle)
+		n.PUT("/plantillas-menu-alimentos/:id", h.UpdateAlimentoPlantillaDetalle)
+		n.DELETE("/plantillas-menu-alimentos/:id", h.DeleteAlimentoPlantillaDetalle)
+
 		// ─── Archivos PDF (biblioteca de la clínica/paciente) ──────────
 		n.GET("/archivos-pdf", h.ListArchivosPDF)
 		n.GET("/archivos-pdf/:pacienteID", h.ListArchivosPDFByPaciente)

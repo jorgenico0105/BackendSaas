@@ -158,6 +158,16 @@ func RunMigrations() {
 	// 	log.Fatal("Migration failed (nutricion - dieta/menu):", err)
 	// }
 
+	// 10b. Nutrición — plantillas de menú semanal (globales por clínica, no por paciente)
+	// Jerarquía: PlantillaSemana → DetallePlantilla (día+comida) → AlimentoPlantilla
+	if err := db.AutoMigrate(
+		&nutricionModels.NutricionMenuPlantillaSemana{},
+		&nutricionModels.NutricionMenuDetallePlantilla{},
+		&nutricionModels.NutricionMenuAlimentoPlantilla{},
+	); err != nil {
+		log.Fatal("Migration failed (nutricion - plantillas menu):", err)
+	}
+
 	// 11. Nutrición — registros y seguimiento del paciente (menu_detalle_id en lugar de dieta_detalle_id)
 	// if err := db.AutoMigrate(
 	// 	&nutricionModels.NutricionR24H{},

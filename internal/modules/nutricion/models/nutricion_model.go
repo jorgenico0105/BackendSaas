@@ -192,6 +192,22 @@ type NutricionMenu struct {
 
 func (NutricionMenu) TableName() string { return "nutricion_menu" }
 
+type NutricionMenuPlantillaSemana struct {
+	ID            uint                            `gorm:"primaryKey;autoIncrement" json:"id"`
+	ClinicaID     uint                            `gorm:"not null;index" json:"clinica_id"`
+	MedicoID      uint                            `gorm:"not null;index" json:"medico_id"`
+	SemanaNumero  int                             `gorm:"not null" json:"semana_numero"`
+	NumComidas    int                             `gorm:"not null;default:5" json:"num_comidas"`
+	Nombre        string                          `gorm:"size:150" json:"nombre,omitempty"`
+	Notas         string                          `gorm:"type:text" json:"notas,omitempty"`
+	State         string                          `gorm:"type:char(1);default:'A';not null" json:"state"`
+	CreadoEn      time.Time                       `gorm:"autoCreateTime;column:creado_en" json:"creado_en"`
+	ActualizadoEn time.Time                       `gorm:"autoUpdateTime;column:actualizado_en" json:"actualizado_en"`
+	Detalles      []NutricionMenuDetallePlantilla `gorm:"foreignKey:MenuID;references:ID" json:"detalles,omitempty"`
+}
+
+func (NutricionMenuPlantillaSemana) TableName() string { return "nutricion_menu_plantilla_semana" }
+
 // ─── Detalle de menú ──────────────────────────────────────────────────────────
 // Cada fila = una comida (tipo_comida) en un día de la semana del menú.
 // Jerarquía: DietaPaciente → Menu (semana) → MenuDetalle (día+comida) → MenuAlimento
@@ -215,6 +231,26 @@ type NutricionMenuDetalle struct {
 }
 
 func (NutricionMenuDetalle) TableName() string { return "nutricion_menu_detalle" }
+
+type NutricionMenuDetallePlantilla struct {
+	ID                  uint                             `gorm:"primaryKey;autoIncrement" json:"id"`
+	MenuID              uint                             `gorm:"not null;index;uniqueIndex:udx_plantilla_dia_comida" json:"menu_id"`
+	TipoComidaID        uint                             `gorm:"not null;uniqueIndex:udx_plantilla_dia_comida" json:"tipo_comida_id"`
+	DiaNúmero           int8                             `gorm:"not null;uniqueIndex:udx_plantilla_dia_comida;column:dia_numero" json:"dia_numero"`
+	NombreComida        string                           `gorm:"size:150" json:"nombre_comida,omitempty"`
+	Instrucciones       string                           `gorm:"type:text" json:"instrucciones,omitempty"`
+	NombreReceta        string                           `gorm:"size:150" json:"nombre_receta,omitempty"`
+	CaloriasTotal       *float64                         `gorm:"type:decimal(8,2)" json:"calorias_total,omitempty"`
+	ProteinasGTotal     *float64                         `gorm:"type:decimal(8,2);column:proteinas_g_total" json:"proteinas_g_total,omitempty"`
+	CarbohidratosGTotal *float64                         `gorm:"type:decimal(8,2)" json:"carbohidratos_g_total,omitempty"`
+	GrasasGTotal        *float64                         `gorm:"type:decimal(8,2)" json:"grasas_g_total,omitempty"`
+	State               string                           `gorm:"type:char(1);default:'A';not null" json:"state"`
+	CreadoEn            time.Time                        `gorm:"autoCreateTime;column:creado_en" json:"creado_en"`
+	ActualizadoEn       time.Time                        `gorm:"autoUpdateTime;column:actualizado_en" json:"actualizado_en"`
+	Alimentos           []NutricionMenuAlimentoPlantilla `gorm:"foreignKey:MenuDetalleID;references:ID" json:"alimentos,omitempty"`
+}
+
+func (NutricionMenuDetallePlantilla) TableName() string { return "nutricion_menu_detalle_plantilla" }
 
 // Nutricion Plantilla Menu
 type NutricionMenuPlantilla struct {
@@ -242,6 +278,24 @@ type NutricionMenuAlimento struct {
 }
 
 func (NutricionMenuAlimento) TableName() string { return "nutricion_menu_alimentos" }
+
+// NutricionMenuAlimento — alimentos asignados a un ítem del detalle del menú.
+type NutricionMenuAlimentoPlantilla struct {
+	ID                 uint              `gorm:"primaryKey;autoIncrement" json:"id"`
+	MenuDetalleID      uint              `gorm:"not null;index" json:"menu_detalle_id"`
+	AlimentoID         uint              `gorm:"not null;index" json:"alimento_id"`
+	GramosAsignados    float64           `gorm:"type:decimal(8,2);not null" json:"gramos_asignados"`
+	CaloriasCalc       *float64          `gorm:"type:decimal(8,2)" json:"calorias_calc,omitempty"`
+	ProteinasGCalc     *float64          `gorm:"type:decimal(8,2);column:proteinas_g_calc" json:"proteinas_g_calc,omitempty"`
+	CarbohidratosGCalc *float64          `gorm:"type:decimal(8,2)" json:"carbohidratos_g_calc,omitempty"`
+	GrasasGCalc        *float64          `gorm:"type:decimal(8,2)" json:"grasas_g_calc,omitempty"`
+	Observacion        string            `gorm:"size:255" json:"observacion,omitempty"`
+	State              string            `gorm:"type:char(1);default:'A';not null" json:"state"`
+	CreadoEn           time.Time         `gorm:"autoCreateTime;column:creado_en" json:"creado_en"`
+	Alimento           NutricionAlimento `gorm:"foreignKey:AlimentoID" json:"Alimento"`
+}
+
+func (NutricionMenuAlimentoPlantilla) TableName() string { return "nutricion_menu_alimentos_plantilla" }
 
 // ─── Recordatorio 24 horas ────────────────────────────────────────────────────
 
@@ -758,6 +812,77 @@ type CreateProgresoRequest struct {
 }
 type AskIaNutricionQuestion struct {
 	Prompt string `json:"prompt" binding:"required"`
+}
+
+// ─── DTOs de plantillas de menú ───────────────────────────────────────────────
+
+type CreatePlantillaSemanaRequest struct {
+	SemanaNumero      int     `json:"semana_numero" binding:"required,min=1"`
+	NumComidas        int     `json:"num_comidas" binding:"required,min=3,max=5"`
+	Nombre            string  `json:"nombre" binding:"required"`
+	Notas             string  `json:"notas"`
+	CaloriasDia       float64 `json:"calorias_dia" binding:"required,gt=0"`
+	ProteinasGDia     float64 `json:"proteinas_g_dia"`
+	CarbohidratosGDia float64 `json:"carbohidratos_g_dia"`
+	GrasasGDia        float64 `json:"grasas_g_dia"`
+}
+
+type UpdatePlantillaSemanaRequest struct {
+	Nombre     string `json:"nombre"`
+	Notas      string `json:"notas"`
+	NumComidas int    `json:"num_comidas"`
+}
+
+type AddDetallePlantillaRequest struct {
+	TipoComidaID  uint   `json:"tipo_comida_id" binding:"required"`
+	DiaNúmero     int8   `json:"dia_numero" binding:"required,min=1,max=7"`
+	NombreComida  string `json:"nombre_comida"`
+	Instrucciones string `json:"instrucciones"`
+	NombreReceta  string `json:"nombre_receta"`
+}
+
+type UpdateDetallePlantillaRequest struct {
+	NombreComida  string `json:"nombre_comida"`
+	Instrucciones string `json:"instrucciones"`
+	NombreReceta  string `json:"nombre_receta"`
+}
+
+type AddAlimentoPlantillaRequest struct {
+	AlimentoID      uint    `json:"alimento_id" binding:"required"`
+	GramosAsignados float64 `json:"gramos_asignados" binding:"required,gt=0"`
+	Observacion     string  `json:"observacion"`
+}
+
+// AssignMenuFromPlantillaRequest — frontend manda la plantilla completa (con cantidades ajustadas)
+type AssignMenuFromPlantillaRequest struct {
+	SemanaNumero int                     `json:"semana_numero" binding:"required,min=1"`
+	FechaInicio  string                  `json:"fecha_inicio" binding:"required"`
+	Nombre       string                  `json:"nombre"`
+	Notas        string                  `json:"notas"`
+	Detalles     []PlantillaDetalleInput `json:"detalles"`
+}
+
+type PlantillaDetalleInput struct {
+	TipoComidaID        uint                     `json:"tipo_comida_id" binding:"required"`
+	DiaNúmero           int8                     `json:"dia_numero" binding:"required,min=1,max=7"`
+	NombreComida        string                   `json:"nombre_comida"`
+	Instrucciones       string                   `json:"instrucciones"`
+	NombreReceta        string                   `json:"nombre_receta"`
+	CaloriasTotal       *float64                 `json:"calorias_total"`
+	ProteinasGTotal     *float64                 `json:"proteinas_g_total"`
+	CarbohidratosGTotal *float64                 `json:"carbohidratos_g_total"`
+	GrasasGTotal        *float64                 `json:"grasas_g_total"`
+	Alimentos           []PlantillaAlimentoInput `json:"alimentos"`
+}
+
+type PlantillaAlimentoInput struct {
+	AlimentoID         uint    `json:"alimento_id" binding:"required"`
+	GramosAsignados    float64 `json:"gramos_asignados" binding:"required,gt=0"`
+	Calorias           float64 `json:"calorias_calc"`
+	CarbohidratosGCalc float64 `json:"carbohidratos_g_calc"`
+	GrasasGCalc        float64 `json:"grasas_g_calc"`
+	ProteinasGCalc     float64 `json:"proteinas_g_calc"`
+	Observacion        string  `json:"observacion"`
 }
 type CreateEjercicioPacienteRequest struct {
 	EjercicioID     uint   `json:"ejercicio_id" binding:"required"`

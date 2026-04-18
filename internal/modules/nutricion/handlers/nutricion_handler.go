@@ -268,23 +268,20 @@ func (h *NutricionHandler) UpdateDieta(c *gin.Context) {
 
 func (h *NutricionHandler) CreateMenu(c *gin.Context) {
 	dietaID, ok := paramUint(c, "dietaId")
-	pacienteID, ok := paramUint(c, "pacienteId")
-
 	if !ok {
 		return
 	}
-	var req models.CreateMenuRequest
+	var req models.AssignMenuFromPlantillaRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		responses.BadRequest(c, "Datos inválidos")
+		responses.BadRequest(c, "Datos inválidos: "+err.Error())
 		return
 	}
-	m, err := h.svc.CreateMenu(dietaID, pacienteID, req)
+	m, err := h.svc.AssignMenuFromPlantilla(dietaID, req)
 	if err != nil {
-		responses.InternalError(c, "Error al crear menú")
+		responses.InternalError(c, "Error al asignar menú al paciente")
 		return
 	}
-
-	responses.Created(c, "Menú creado", m)
+	responses.Created(c, "Menú asignado al paciente", m)
 }
 
 func (h *NutricionHandler) AddDetalleMenu(c *gin.Context) {
@@ -1034,6 +1031,217 @@ func (h *NutricionHandler) ListLogrosCatalogo(c *gin.Context) {
 	}
 	responses.Success(c, "Catálogo de logros", list)
 }
+// ─── Plantillas de menú semanal ───────────────────────────────────────────────
+
+func (h *NutricionHandler) ListPlantillas(c *gin.Context) {
+	clinicaID := c.GetUint("clinicaID")
+
+	var numComidas *int
+	if v := c.Query("num_comidas"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err == nil {
+			numComidas = &n
+		}
+	}
+	var semanaNumero *int
+	if v := c.Query("semana_numero"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err == nil {
+			semanaNumero = &n
+		}
+	}
+
+	list, err := h.svc.ListPlantillas(clinicaID, numComidas, semanaNumero)
+	if err != nil {
+		responses.InternalError(c, "Error al listar plantillas de menú")
+		return
+	}
+	responses.Success(c, "Plantillas de menú", list)
+}
+
+func (h *NutricionHandler) CreatePlantillaSemana(c *gin.Context) {
+	var req models.CreatePlantillaSemanaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		responses.BadRequest(c, "Datos inválidos: "+err.Error())
+		return
+	}
+	clinicaID := c.GetUint("clinicaID")
+	medicoID := c.GetUint("userID")
+	p, err := h.svc.CreatePlantillaSemana(clinicaID, medicoID, req)
+	if err != nil {
+		responses.InternalError(c, "Error al crear plantilla de menú")
+		return
+	}
+	responses.Created(c, "Plantilla de menú creada", p)
+}
+
+func (h *NutricionHandler) GetPlantillaSemana(c *gin.Context) {
+	id, ok := paramUint(c, "plantillaId")
+	if !ok {
+		return
+	}
+	p, err := h.svc.GetPlantillaSemana(id)
+	if err != nil {
+		responses.NotFound(c, "Plantilla de menú no encontrada")
+		return
+	}
+	responses.Success(c, "Plantilla de menú", p)
+}
+
+func (h *NutricionHandler) UpdatePlantillaSemana(c *gin.Context) {
+	id, ok := paramUint(c, "plantillaId")
+	if !ok {
+		return
+	}
+	var req models.UpdatePlantillaSemanaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		responses.BadRequest(c, "Datos inválidos")
+		return
+	}
+	p, err := h.svc.UpdatePlantillaSemana(id, req)
+	if err != nil {
+		responses.NotFound(c, "Plantilla de menú no encontrada")
+		return
+	}
+	responses.Success(c, "Plantilla de menú actualizada", p)
+}
+
+func (h *NutricionHandler) DeletePlantillaSemana(c *gin.Context) {
+	id, ok := paramUint(c, "plantillaId")
+	if !ok {
+		return
+	}
+	if err := h.svc.DeletePlantillaSemana(id); err != nil {
+		responses.NotFound(c, "Plantilla de menú no encontrada")
+		return
+	}
+	responses.Success(c, "Plantilla de menú eliminada", nil)
+}
+
+func (h *NutricionHandler) AddDetallePlantilla(c *gin.Context) {
+	plantillaID, ok := paramUint(c, "plantillaId")
+	if !ok {
+		return
+	}
+	var req models.AddDetallePlantillaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		responses.BadRequest(c, "Datos inválidos: "+err.Error())
+		return
+	}
+	d, err := h.svc.AddDetallePlantilla(plantillaID, req)
+	if err != nil {
+		responses.InternalError(c, "Error al agregar detalle a la plantilla")
+		return
+	}
+	responses.Created(c, "Detalle agregado a la plantilla", d)
+}
+
+func (h *NutricionHandler) GetDetallesPlantilla(c *gin.Context) {
+	plantillaID, ok := paramUint(c, "plantillaId")
+	if !ok {
+		return
+	}
+	list, err := h.svc.GetDetallesPlantilla(plantillaID)
+	if err != nil {
+		responses.InternalError(c, "Error al obtener detalles de la plantilla")
+		return
+	}
+	responses.Success(c, "Detalles de la plantilla", list)
+}
+
+func (h *NutricionHandler) UpdateDetallePlantilla(c *gin.Context) {
+	detalleID, ok := paramUint(c, "detalleId")
+	if !ok {
+		return
+	}
+	var req models.UpdateDetallePlantillaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		responses.BadRequest(c, "Datos inválidos")
+		return
+	}
+	d, err := h.svc.UpdateDetallePlantilla(detalleID, req)
+	if err != nil {
+		responses.NotFound(c, "Detalle de plantilla no encontrado")
+		return
+	}
+	responses.Success(c, "Detalle de plantilla actualizado", d)
+}
+
+func (h *NutricionHandler) DeleteDetallePlantilla(c *gin.Context) {
+	detalleID, ok := paramUint(c, "detalleId")
+	if !ok {
+		return
+	}
+	if err := h.svc.DeleteDetallePlantilla(detalleID); err != nil {
+		responses.NotFound(c, "Detalle de plantilla no encontrado")
+		return
+	}
+	responses.Success(c, "Detalle de plantilla eliminado", nil)
+}
+
+func (h *NutricionHandler) AddAlimentoPlantillaDetalle(c *gin.Context) {
+	detalleID, ok := paramUint(c, "detalleId")
+	if !ok {
+		return
+	}
+	var req models.AddAlimentoPlantillaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		responses.BadRequest(c, "Datos inválidos: "+err.Error())
+		return
+	}
+	a, err := h.svc.AddAlimentoPlantillaDetalle(detalleID, req)
+	if err != nil {
+		responses.InternalError(c, "Error al agregar alimento a la plantilla")
+		return
+	}
+	responses.Created(c, "Alimento agregado a la plantilla", a)
+}
+
+func (h *NutricionHandler) GetAlimentosPlantillaDetalle(c *gin.Context) {
+	detalleID, ok := paramUint(c, "detalleId")
+	if !ok {
+		return
+	}
+	list, err := h.svc.GetAlimentosPlantillaDetalle(detalleID)
+	if err != nil {
+		responses.InternalError(c, "Error al obtener alimentos del detalle de plantilla")
+		return
+	}
+	responses.Success(c, "Alimentos del detalle de plantilla", list)
+}
+
+func (h *NutricionHandler) UpdateAlimentoPlantillaDetalle(c *gin.Context) {
+	id, ok := paramUint(c, "id")
+	if !ok {
+		return
+	}
+	var req struct {
+		GramosAsignados float64 `json:"gramos_asignados" binding:"required,gt=0"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		responses.BadRequest(c, "Datos inválidos: gramos_asignados requerido y mayor a 0")
+		return
+	}
+	a, err := h.svc.UpdateAlimentoPlantillaDetalle(id, req.GramosAsignados)
+	if err != nil {
+		responses.NotFound(c, "Alimento de plantilla no encontrado")
+		return
+	}
+	responses.Success(c, "Gramaje actualizado en plantilla", a)
+}
+
+func (h *NutricionHandler) DeleteAlimentoPlantillaDetalle(c *gin.Context) {
+	id, ok := paramUint(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.svc.DeleteAlimentoPlantillaDetalle(id); err != nil {
+		responses.NotFound(c, "Alimento de plantilla no encontrado")
+		return
+	}
+	responses.Success(c, "Alimento eliminado de la plantilla", nil)
+}
+
 func (h *NutricionHandler) ChatWhitIa(c *gin.Context) {
 	pacienteID, ok := paramUint(c, "pacienteId")
 	if !ok {

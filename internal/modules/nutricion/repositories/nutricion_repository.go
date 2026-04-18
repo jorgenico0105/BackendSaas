@@ -242,9 +242,11 @@ func (r *NutricionRepository) UpdateMenu(m *models.NutricionMenu) error {
 
 func (r *NutricionRepository) FindMenusRequierenCambio() ([]models.NutricionMenu, error) {
 	var list []models.NutricionMenu
-	err := r.db.Preload("Dieta").Preload("Dieta.Paciente").Where("fecha_fin = DATE_ADD(CURDATE(), INTERVAL 1 DAY) AND state = 'A'").
+	err := r.db.
+		Preload("Dieta").
+		Preload("Dieta.Paciente").
+		Where("DATE(fecha_fin) = CURDATE() AND state = 'A'").
 		Find(&list).Error
-
 	return list, err
 }
 
@@ -625,4 +627,117 @@ func (r *NutricionRepository) FindDietaActivaByPaciente(pacienteID uint) (*model
 	err := r.db.Where("paciente_id = ? AND estado = 'ACTIVA' AND state = 'A'", pacienteID).
 		Order("fecha_inicio DESC").First(&d).Error
 	return &d, err
+}
+
+// ─── Plantillas de menú semanal ───────────────────────────────────────────────
+
+func (r *NutricionRepository) CreatePlantillaSemana(p *models.NutricionMenuPlantillaSemana) error {
+	return r.db.Create(p).Error
+}
+
+func (r *NutricionRepository) FindPlantillas(clinicaID uint, numComidas *int, semanaNumero *int) ([]models.NutricionMenuPlantillaSemana, error) {
+	var list []models.NutricionMenuPlantillaSemana
+	q := r.db.Where("clinica_id = ? AND state = 'A'", clinicaID)
+	if numComidas != nil {
+		q = q.Where("num_comidas = ?", *numComidas)
+	}
+	if semanaNumero != nil {
+		q = q.Where("semana_numero = ?", *semanaNumero)
+	}
+	err := q.Order("semana_numero ASC, num_comidas ASC").Find(&list).Error
+	return list, err
+}
+
+func (r *NutricionRepository) FindPlantillaSemanaByID(id uint) (*models.NutricionMenuPlantillaSemana, error) {
+	var p models.NutricionMenuPlantillaSemana
+	err := r.db.Preload("Detalles", "state = 'A'").
+		Preload("Detalles.Alimentos", "state = 'A'").
+		Preload("Detalles.Alimentos.Alimento").
+		First(&p, "id = ? AND state = 'A'", id).Error
+	return &p, err
+}
+
+func (r *NutricionRepository) UpdatePlantillaSemana(p *models.NutricionMenuPlantillaSemana) error {
+	return r.db.Save(p).Error
+}
+
+func (r *NutricionRepository) DeletePlantillaSemana(id uint) error {
+	return r.db.Model(&models.NutricionMenuPlantillaSemana{}).Where("id = ?", id).Update("state", "I").Error
+}
+
+// ─── Detalles de plantilla ────────────────────────────────────────────────────
+
+func (r *NutricionRepository) CreateDetallePlantilla(d *models.NutricionMenuDetallePlantilla) error {
+	return r.db.Create(d).Error
+}
+
+func (r *NutricionRepository) FindDetallesByPlantilla(plantillaID uint) ([]models.NutricionMenuDetallePlantilla, error) {
+	var list []models.NutricionMenuDetallePlantilla
+	err := r.db.Preload("Alimentos", "state = 'A'").
+		Preload("Alimentos.Alimento").
+		Where("menu_id = ? AND state = 'A'", plantillaID).
+		Order("dia_numero ASC, tipo_comida_id ASC").Find(&list).Error
+	return list, err
+}
+
+func (r *NutricionRepository) FindDetallePlantillaByID(id uint) (*models.NutricionMenuDetallePlantilla, error) {
+	var d models.NutricionMenuDetallePlantilla
+	err := r.db.Preload("Alimentos", "state = 'A'").
+		First(&d, "id = ? AND state = 'A'", id).Error
+	return &d, err
+}
+
+func (r *NutricionRepository) UpdateDetallePlantilla(d *models.NutricionMenuDetallePlantilla) error {
+	return r.db.Save(d).Error
+}
+
+func (r *NutricionRepository) DeleteDetallePlantilla(id uint) error {
+	return r.db.Model(&models.NutricionMenuDetallePlantilla{}).Where("id = ?", id).Update("state", "I").Error
+}
+
+// ─── Alimentos de plantilla ───────────────────────────────────────────────────
+
+func (r *NutricionRepository) CreateAlimentoPlantilla(a *models.NutricionMenuAlimentoPlantilla) error {
+	return r.db.Create(a).Error
+}
+
+func (r *NutricionRepository) FindAlimentosByDetallePlantilla(detalleID uint) ([]models.NutricionMenuAlimentoPlantilla, error) {
+	var list []models.NutricionMenuAlimentoPlantilla
+	err := r.db.Preload("Alimento").
+		Where("menu_detalle_id = ? AND state = 'A'", detalleID).Find(&list).Error
+	return list, err
+}
+
+func (r *NutricionRepository) FindAlimentoPlantillaByID(id uint) (*models.NutricionMenuAlimentoPlantilla, error) {
+	var a models.NutricionMenuAlimentoPlantilla
+	err := r.db.Preload("Alimento").First(&a, "id = ? AND state = 'A'", id).Error
+	return &a, err
+}
+
+func (r *NutricionRepository) UpdateAlimentoPlantillaGramos(id uint, gramos, cal, prot, carb, gras float64) error {
+	return r.db.Model(&models.NutricionMenuAlimentoPlantilla{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"gramos_asignados":     gramos,
+		"calorias_calc":        cal,
+		"proteinas_g_calc":     prot,
+		"carbohidratos_g_calc": carb,
+		"grasas_g_calc":        gras,
+	}).Error
+}
+
+func (r *NutricionRepository) DeleteAlimentoPlantilla(id uint) error {
+	return r.db.Model(&models.NutricionMenuAlimentoPlantilla{}).Where("id = ?", id).Update("state", "I").Error
+}
+
+func (r *NutricionRepository) CreateMenuDetallesPlantilla(detalles []*models.NutricionMenuDetallePlantilla) ([]*models.NutricionMenuDetallePlantilla, error) {
+	if err := r.db.Create(&detalles).Error; err != nil {
+		return nil, err
+	}
+	return detalles, nil
+}
+
+func (r *NutricionRepository) AddAlimentosToPlantillaComidas(alimentos []*models.NutricionMenuAlimentoPlantilla) ([]*models.NutricionMenuAlimentoPlantilla, error) {
+	if err := r.db.Create(&alimentos).Error; err != nil {
+		return nil, err
+	}
+	return alimentos, nil
 }

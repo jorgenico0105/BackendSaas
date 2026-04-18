@@ -291,122 +291,30 @@ func (s *NutricionService) UpdateDieta(id uint, req models.UpdateDietaRequest) (
 }
 
 // ─── Menús ────────────────────────────────────────────────────────────────────
-func (s *NutricionService) CreateMenu(dietaID, pacienteID uint, req models.CreateMenuRequest) (*models.NutricionMenu, error) {
+
+// AssignMenuFromPlantilla crea un menú semanal para el paciente a partir de la
+// plantilla editada que envía el frontend (cantidades ya ajustadas).
+func (s *NutricionService) AssignMenuFromPlantilla(dietaID uint, req models.AssignMenuFromPlantillaRequest) (*models.NutricionMenu, error) {
 	fechaInicio, err := time.ParseInLocation("2006-01-02", req.FechaInicio, time.Local)
 	if err != nil {
 		fechaInicio = time.Now()
 	}
 	fechaFin := fechaInicio.AddDate(0, 0, 6)
-	mpa, err := s.repo.GetMenuPlantilla(dietaID)
-	if err != nil {
-		return nil, err
+	var firstErr error
+	var alimentos []*models.NutricionMenuAlimento
+	var detalles []*models.NutricionMenuDetalle
+
+	log.Println("Llega aqui, y se demora")
+
+	var wg sync.WaitGroup
+
+	setErr := func(e error) {
+		if firstErr == nil {
+			firstErr = e
+		}
 	}
-	if mpa.MenuID != 0 {
-		menu, err := s.repo.FindMenuByID(mpa.MenuID)
-		if err != nil {
-			return nil, err
-		}
 
-		menuToSave := &models.NutricionMenu{
-			DietaPacienteID: dietaID,
-			SemanaNumero:    req.SemanaNumero,
-			Nombre:          req.Nombre,
-			Notas:           req.Notas,
-			FechaInicio:     fechaInicio,
-			FechaFin:        fechaFin,
-			Estado:          "ACTIVO",
-			State:           "A",
-		}
-
-		err = s.repo.CreateMenu(menuToSave)
-		if err != nil {
-			return nil, err
-		}
-		type detallePair struct {
-			original models.NutricionMenuDetalle
-			nuevo    *models.NutricionMenuDetalle
-		}
-
-		var pares []detallePair
-		var detallesNuevos []*models.NutricionMenuDetalle
-
-		for i := range menu.Detalles {
-			src := menu.Detalles[i]
-
-			nuevoDetalle := &models.NutricionMenuDetalle{
-				MenuID:              menuToSave.ID,
-				TipoComidaID:        src.TipoComidaID,
-				DiaNúmero:           src.DiaNúmero,
-				NombreComida:        src.NombreComida,
-				Instrucciones:       src.Instrucciones,
-				CaloriasTotal:       src.CaloriasTotal,
-				ProteinasGTotal:     src.ProteinasGTotal,
-				CarbohidratosGTotal: src.CarbohidratosGTotal,
-				GrasasGTotal:        src.GrasasGTotal,
-				State:               src.State,
-			}
-
-			detallesNuevos = append(detallesNuevos, nuevoDetalle)
-			pares = append(pares, detallePair{
-				original: src,
-				nuevo:    nuevoDetalle,
-			})
-		}
-
-		foods, err := s.repo.CreateMenuDetalles(detallesNuevos)
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-
-		if len(foods) != len(pares) {
-			return nil, errors.New("no coincide la cantidad de detalles creados con la plantilla")
-		}
-
-		for i := range foods {
-			pares[i].nuevo.ID = foods[i].ID
-		}
-
-		var alimentos []*models.NutricionMenuAlimento
-
-		for _, par := range pares {
-			for j := range par.original.Alimentos {
-				srcAl := par.original.Alimentos[j]
-
-				nuevoAlimento := &models.NutricionMenuAlimento{
-					MenuDetalleID:      par.nuevo.ID,
-					AlimentoID:         srcAl.AlimentoID,
-					GramosAsignados:    srcAl.GramosAsignados,
-					CaloriasCalc:       srcAl.CaloriasCalc,
-					ProteinasGCalc:     srcAl.ProteinasGCalc,
-					CarbohidratosGCalc: srcAl.CarbohidratosGCalc,
-					GrasasGCalc:        srcAl.GrasasGCalc,
-					Observacion:        srcAl.Observacion,
-					State:              srcAl.State,
-				}
-
-				alimentos = append(alimentos, nuevoAlimento)
-			}
-		}
-
-		if len(alimentos) > 0 {
-			_, err = s.repo.AddAlimentosToComidas(alimentos)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		err = s.repo.UpdateMenuPlantilla(mpa.DietaPacienteID, menuToSave.ID)
-		if err != nil {
-			return nil, err
-		}
-
-		return menuToSave, nil
-	}
-	var userAlimento []models.NutricionAlimento
-	done := make(chan struct{})
-
-	m := &models.NutricionMenu{
+	menu := &models.NutricionMenu{
 		DietaPacienteID: dietaID,
 		SemanaNumero:    req.SemanaNumero,
 		Nombre:          req.Nombre,
@@ -417,103 +325,74 @@ func (s *NutricionService) CreateMenu(dietaID, pacienteID uint, req models.Creat
 		State:           "A",
 	}
 
-	if err := s.repo.CreateMenu(m); err != nil {
+	err = s.repo.CreateMenu(menu)
+	if err != nil {
+		setErr(err)
 		return nil, err
 	}
-	mp := &models.NutricionMenuPlantilla{
-		MenuID:          m.ID,
-		DietaPacienteID: dietaID,
+	for i := range req.Detalles {
+		det := req.Detalles[i]
+		detalle := &models.NutricionMenuDetalle{
+			MenuID:              menu.ID,
+			TipoComidaID:        det.TipoComidaID,
+			DiaNúmero:           det.DiaNúmero,
+			NombreComida:        det.NombreComida,
+			Instrucciones:       det.Instrucciones,
+			NombreReceta:        det.NombreReceta,
+			CaloriasTotal:       det.CaloriasTotal,
+			ProteinasGTotal:     det.ProteinasGTotal,
+			CarbohidratosGTotal: det.CarbohidratosGTotal,
+			GrasasGTotal:        det.GrasasGTotal,
+			State:               "A",
+		}
+		detalles = append(detalles, detalle)
 	}
-	if err := s.repo.CreateMenuPlantilla(mp); err != nil {
+	details, err := s.repo.CreateMenuDetalles(detalles)
+	if err != nil {
+		log.Println(err)
+		setErr(err)
 		return nil, err
 	}
-	var (
-		preferences []models.NutricionPreferenciaAlimento
-		alimentos   []models.NutricionAlimento
-		dieta       *models.NutricionDietaPaciente
-		tipoComida  []models.NutricionTipoComida
-	)
 
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	var firstErr error
-	setErr := func(err error) {
-		mu.Lock()
-		defer mu.Unlock()
-		if firstErr == nil {
-			firstErr = err
+	mapId := make(map[string]uint)
+
+	for _, detail := range details {
+		key := fmt.Sprintf("%d_%d", detail.DiaNúmero, detail.TipoComidaID)
+		mapId[key] = detail.ID
+	}
+	for _, det := range req.Detalles {
+		key := fmt.Sprintf("%d_%d", det.DiaNúmero, det.TipoComidaID)
+		for _, al := range det.Alimentos {
+			alimento := &models.NutricionMenuAlimento{
+				MenuDetalleID:      mapId[key],
+				AlimentoID:         al.AlimentoID,
+				GramosAsignados:    al.GramosAsignados,
+				CaloriasCalc:       &al.Calorias,
+				GrasasGCalc:        &al.GrasasGCalc,
+				ProteinasGCalc:     &al.ProteinasGCalc,
+				CarbohidratosGCalc: &al.CarbohidratosGCalc,
+				State:              "A",
+				Observacion:        "OK!",
+			}
+			alimentos = append(alimentos, alimento)
 		}
 	}
-	wg.Add(4)
-	go func() {
-		defer wg.Done()
-		data, err := s.ListPreferencias(pacienteID)
-		if err != nil {
-			setErr(err)
-			return
-		}
-		mu.Lock()
-		preferences = data
-		mu.Unlock()
-	}()
-	go func() {
-		defer wg.Done()
-		data, err := s.ListAlimentos("")
-		if err != nil {
-			setErr(err)
-			return
-		}
-		mu.Lock()
-		alimentos = data
-		mu.Unlock()
-	}()
-	go func() {
-		defer wg.Done()
-		data, err := s.GetDieta(dietaID)
-		if err != nil {
-			setErr(err)
-			return
-		}
-		mu.Lock()
-		dieta = data
-		mu.Unlock()
-	}()
-	go func() {
-		defer wg.Done()
-		data, err := s.ListTipoComidas()
-		if err != nil {
-			setErr(err)
-			return
-		}
-		mu.Lock()
-		tipoComida = data
-		mu.Unlock()
-	}()
+	_, err = s.repo.AddAlimentosToComidas(alimentos)
+	if err != nil {
+		log.Println(err)
+		setErr(err)
+		return nil, err
+	}
+
 	wg.Wait()
 	if firstErr != nil {
 		return nil, firstErr
 	}
 
-	prefMap := make(map[uint]bool)
-	for _, pref := range preferences {
-		if pref.AlimentoID != nil {
-			prefMap[*pref.AlimentoID] = true
-		}
-	}
-
-	for _, alimento := range alimentos {
-		if !prefMap[alimento.ID] {
-			userAlimento = append(userAlimento, alimento)
-		}
-	}
-
-	go s.GenerateMenuFoods(userAlimento, dieta, m, tipoComida, done)
-	<-done
-
-	return m, nil
+	return menu, nil
 }
 
-func (s *NutricionService) GenerateMenuFoods(
+func (s *NutricionService) _unusedGenerateMenuFoods(
 	alimentosUser []models.NutricionAlimento,
 	dieta *models.NutricionDietaPaciente,
 	menu *models.NutricionMenu,
@@ -774,7 +653,7 @@ func randomAlimento(alimentos []*models.NutricionAlimento) *models.NutricionAlim
 
 const (
 	gramosPorcionRef = 100.0
-	maxIteraciones   = 40
+	maxIteraciones   = 70
 
 	// tolerancias por comida
 	toleranciaProte = 4.0
@@ -790,7 +669,7 @@ const (
 	carbMin = 60.0
 	carbMax = 260.0
 
-	grasaMin = 5.0
+	grasaMin = 25.0
 	grasaMax = 30.0
 
 	fibraMin = 30.0
@@ -801,7 +680,7 @@ const (
 	gramosProteMax = 200.0
 	gramosCarbMin  = 100.0
 	gramosCarbMax  = 300.0
-	gramosGrasaMin = 5.0
+	gramosGrasaMin = 25.0
 	gramosGrasaMax = 30.0
 )
 
@@ -1086,6 +965,177 @@ func agruparAlimentosPorMomento(alimentos []models.NutricionAlimento) AlimentosP
 	}
 
 	return result
+}
+
+// ─── Generación automática de plantillas ─────────────────────────────────────
+
+// GeneratePlantillaFoods genera los NutricionMenuDetallePlantilla (7 días × num_comidas)
+// y los NutricionMenuAlimentoPlantilla usando el mismo algoritmo de auto-generación.
+func (s *NutricionService) GeneratePlantillaFoods(
+	plantilla *models.NutricionMenuPlantillaSemana,
+	calorias, proteinas, carbos, grasas float64,
+	tiposComida []models.NutricionTipoComida,
+	alimentos []models.NutricionAlimento,
+	done chan struct{},
+) error {
+	defer close(done)
+
+	proteinas = clampMacro(proteinas, gramosProteMin, gramosProteMax)
+	carbos = clampMacro(carbos, gramosCarbMin, gramosCarbMax)
+	grasas = clampMacro(grasas, gramosGrasaMin, gramosGrasaMax)
+
+	foodsMap := make(map[uint]float64)
+	switch plantilla.NumComidas {
+	case 3:
+		foodsMap[1] = 0.30
+		foodsMap[3] = 0.40
+		foodsMap[5] = 0.30
+	case 4:
+		foodsMap[1] = 0.25
+		foodsMap[2] = 0.15
+		foodsMap[3] = 0.35
+		foodsMap[5] = 0.25
+	default: // 5
+		foodsMap[1] = 0.25
+		foodsMap[2] = 0.10
+		foodsMap[3] = 0.30
+		foodsMap[4] = 0.10
+		foodsMap[5] = 0.25
+	}
+
+	var detalles []*models.NutricionMenuDetallePlantilla
+	for _, comida := range tiposComida {
+		porcion, ok := foodsMap[comida.ID]
+		if !ok {
+			continue
+		}
+		for dia := 1; dia <= 7; dia++ {
+			protComida := proteinas * porcion
+			carbComida := carbos * porcion
+			grasComida := grasas * porcion
+			calComida := calorias * porcion
+
+			d := &models.NutricionMenuDetallePlantilla{
+				MenuID:              plantilla.ID,
+				TipoComidaID:        comida.ID,
+				DiaNúmero:           int8(dia),
+				NombreComida:        comida.Nombre,
+				Instrucciones:       "(Opcional)",
+				CaloriasTotal:       &calComida,
+				ProteinasGTotal:     &protComida,
+				CarbohidratosGTotal: &carbComida,
+				GrasasGTotal:        &grasComida,
+				State:               "A",
+			}
+			detalles = append(detalles, d)
+		}
+	}
+
+	creados, err := s.repo.CreateMenuDetallesPlantilla(detalles)
+	if err != nil {
+		return err
+	}
+
+	doneAl := make(chan struct{})
+	go s.addAlimentosToPlantillaComidas(doneAl, creados, alimentos)
+	<-doneAl
+	return nil
+}
+
+func (s *NutricionService) addAlimentosToPlantillaComidas(
+	done chan struct{},
+	detalles []*models.NutricionMenuDetallePlantilla,
+	alimentosUser []models.NutricionAlimento,
+) {
+	defer close(done)
+
+	requerimientos, err := s.repo.GetRequerimientosPorComida()
+	if err != nil {
+		log.Println("[plantilla] error obteniendo requerimientos:", err)
+		return
+	}
+
+	foodDay := make(map[int][]*models.NutricionMenuDetallePlantilla)
+	alimentoDetalle := make(map[int][]*models.NutricionAlimento)
+	for _, d := range detalles {
+		foodDay[int(d.DiaNúmero)] = append(foodDay[int(d.DiaNúmero)], d)
+	}
+
+	agrupados := agruparAlimentosPorMomento(alimentosUser)
+
+	for _, comidas := range foodDay {
+		for _, c := range comidas {
+			switch c.TipoComidaID {
+			case 1:
+				for _, v := range requerimientos[c.TipoComidaID] {
+					if al := randomAlimento(agrupados.Desayuno[uint(v)]); al != nil {
+						alimentoDetalle[int(c.ID)] = append(alimentoDetalle[int(c.ID)], al)
+					}
+				}
+			case 2, 4:
+				usados := make(map[uint]bool)
+				for _, v := range requerimientos[c.TipoComidaID] {
+					if len(alimentoDetalle[int(c.ID)]) >= 2 || usados[uint(v)] {
+						continue
+					}
+					if al := randomAlimento(agrupados.Media[uint(v)]); al != nil {
+						alimentoDetalle[int(c.ID)] = append(alimentoDetalle[int(c.ID)], al)
+						usados[uint(v)] = true
+					}
+				}
+			case 3:
+				for _, v := range requerimientos[c.TipoComidaID] {
+					if al := randomAlimento(agrupados.Almuerzo[uint(v)]); al != nil {
+						alimentoDetalle[int(c.ID)] = append(alimentoDetalle[int(c.ID)], al)
+					}
+				}
+			case 5:
+				for _, v := range requerimientos[c.TipoComidaID] {
+					if al := randomAlimento(agrupados.Merienda[uint(v)]); al != nil {
+						alimentoDetalle[int(c.ID)] = append(alimentoDetalle[int(c.ID)], al)
+					}
+				}
+			}
+		}
+	}
+
+	var alimentosToSave []*models.NutricionMenuAlimentoPlantilla
+	for _, d := range detalles {
+		objP, objC, objG, objCal := 0.0, 0.0, 0.0, 0.0
+		if d.CaloriasTotal != nil {
+			objCal = *d.CaloriasTotal
+		}
+		if d.ProteinasGTotal != nil {
+			objP = *d.ProteinasGTotal
+		}
+		if d.GrasasGTotal != nil {
+			objG = *d.GrasasGTotal
+		}
+		if d.CarbohidratosGTotal != nil {
+			objC = *d.CarbohidratosGTotal
+		}
+
+		items := calcularGramosPorAlimento(alimentoDetalle[int(d.ID)], objP, objC, objG, objCal, 1.5)
+		for _, item := range items {
+			p, c, g, cal := macrosDeAlimento(item.Alimento, item.Gramos)
+			alimentosToSave = append(alimentosToSave, &models.NutricionMenuAlimentoPlantilla{
+				MenuDetalleID:      d.ID,
+				AlimentoID:         item.Alimento.ID,
+				GramosAsignados:    item.Gramos,
+				CaloriasCalc:       &cal,
+				ProteinasGCalc:     &p,
+				CarbohidratosGCalc: &c,
+				GrasasGCalc:        &g,
+				State:              "A",
+			})
+		}
+	}
+
+	if len(alimentosToSave) > 0 {
+		if _, err := s.repo.AddAlimentosToPlantillaComidas(alimentosToSave); err != nil {
+			log.Println("[plantilla] error guardando alimentos:", err)
+		}
+	}
 }
 
 func (s *NutricionService) ListMenusByDieta(dietaID uint) ([]models.NutricionMenu, error) {
@@ -1803,6 +1853,208 @@ func (s *NutricionService) ListLogros(pacienteID uint) ([]models.NutricionLogroP
 
 func (s *NutricionService) ListLogrosCatalogo() ([]models.NutricionLogroCatalogo, error) {
 	return s.repo.FindLogrosCatalogo()
+}
+
+// ─── Plantillas de menú semanal ───────────────────────────────────────────────
+
+func (s *NutricionService) CreatePlantillaSemana(clinicaID, medicoID uint, req models.CreatePlantillaSemanaRequest) (*models.NutricionMenuPlantillaSemana, error) {
+	p := &models.NutricionMenuPlantillaSemana{
+		ClinicaID:    clinicaID,
+		MedicoID:     medicoID,
+		SemanaNumero: req.SemanaNumero,
+		NumComidas:   req.NumComidas,
+		Nombre:       req.Nombre,
+		Notas:        req.Notas,
+		State:        "A",
+	}
+	if err := s.repo.CreatePlantillaSemana(p); err != nil {
+		return nil, err
+	}
+
+	// Auto-generar detalles y alimentos en goroutine
+	var (
+		alimentos  []models.NutricionAlimento
+		tipoComida []models.NutricionTipoComida
+		firstErr   error
+	)
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	setErr := func(e error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if firstErr == nil {
+			firstErr = e
+		}
+	}
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		data, err := s.ListAlimentos("")
+		if err != nil {
+			setErr(err)
+			return
+		}
+		mu.Lock()
+		alimentos = data
+		mu.Unlock()
+	}()
+	go func() {
+		defer wg.Done()
+		data, err := s.ListTipoComidas()
+		if err != nil {
+			setErr(err)
+			return
+		}
+		mu.Lock()
+		tipoComida = data
+		mu.Unlock()
+	}()
+	wg.Wait()
+	if firstErr != nil {
+		return nil, firstErr
+	}
+
+	done := make(chan struct{})
+	go s.GeneratePlantillaFoods(
+		p,
+		req.CaloriasDia, req.ProteinasGDia, req.CarbohidratosGDia, req.GrasasGDia,
+		tipoComida, alimentos, done,
+	)
+	<-done
+
+	return p, nil
+}
+
+func (s *NutricionService) ListPlantillas(clinicaID uint, numComidas *int, semanaNumero *int) ([]models.NutricionMenuPlantillaSemana, error) {
+	return s.repo.FindPlantillas(clinicaID, numComidas, semanaNumero)
+}
+
+func (s *NutricionService) GetPlantillaSemana(id uint) (*models.NutricionMenuPlantillaSemana, error) {
+	return s.repo.FindPlantillaSemanaByID(id)
+}
+
+func (s *NutricionService) UpdatePlantillaSemana(id uint, req models.UpdatePlantillaSemanaRequest) (*models.NutricionMenuPlantillaSemana, error) {
+	p, err := s.repo.FindPlantillaSemanaByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if req.Nombre != "" {
+		p.Nombre = req.Nombre
+	}
+	if req.Notas != "" {
+		p.Notas = req.Notas
+	}
+	if req.NumComidas >= 3 {
+		p.NumComidas = req.NumComidas
+	}
+	return p, s.repo.UpdatePlantillaSemana(p)
+}
+
+func (s *NutricionService) DeletePlantillaSemana(id uint) error {
+	return s.repo.DeletePlantillaSemana(id)
+}
+
+func (s *NutricionService) AddDetallePlantilla(plantillaID uint, req models.AddDetallePlantillaRequest) (*models.NutricionMenuDetallePlantilla, error) {
+	d := &models.NutricionMenuDetallePlantilla{
+		MenuID:        plantillaID,
+		TipoComidaID:  req.TipoComidaID,
+		DiaNúmero:     req.DiaNúmero,
+		NombreComida:  req.NombreComida,
+		Instrucciones: req.Instrucciones,
+		NombreReceta:  req.NombreReceta,
+		State:         "A",
+	}
+	return d, s.repo.CreateDetallePlantilla(d)
+}
+
+func (s *NutricionService) GetDetallesPlantilla(plantillaID uint) ([]models.NutricionMenuDetallePlantilla, error) {
+	return s.repo.FindDetallesByPlantilla(plantillaID)
+}
+
+func (s *NutricionService) UpdateDetallePlantilla(detalleID uint, req models.UpdateDetallePlantillaRequest) (*models.NutricionMenuDetallePlantilla, error) {
+	d, err := s.repo.FindDetallePlantillaByID(detalleID)
+	if err != nil {
+		return nil, err
+	}
+	if req.NombreComida != "" {
+		d.NombreComida = req.NombreComida
+	}
+	if req.Instrucciones != "" {
+		d.Instrucciones = req.Instrucciones
+	}
+	if req.NombreReceta != "" {
+		d.NombreReceta = req.NombreReceta
+	}
+	return d, s.repo.UpdateDetallePlantilla(d)
+}
+
+func (s *NutricionService) DeleteDetallePlantilla(id uint) error {
+	return s.repo.DeleteDetallePlantilla(id)
+}
+
+func (s *NutricionService) AddAlimentoPlantillaDetalle(detalleID uint, req models.AddAlimentoPlantillaRequest) (*models.NutricionMenuAlimentoPlantilla, error) {
+	alimento, err := s.repo.FindAlimentoByID(req.AlimentoID)
+	if err != nil {
+		return nil, ErrAlimentoNotFound
+	}
+	gramos := req.GramosAsignados
+	porcion := alimento.GramosPorcion
+	if porcion == 0 {
+		porcion = 100
+	}
+	ratio := gramos / porcion
+	cal := round2(alimento.Calorias * ratio)
+	prot := round2(alimento.ProteínasG * ratio)
+	carb := round2(alimento.CarbohidratosG * ratio)
+	gras := round2(alimento.GrasasG * ratio)
+
+	a := &models.NutricionMenuAlimentoPlantilla{
+		MenuDetalleID:      detalleID,
+		AlimentoID:         req.AlimentoID,
+		GramosAsignados:    gramos,
+		CaloriasCalc:       &cal,
+		ProteinasGCalc:     &prot,
+		CarbohidratosGCalc: &carb,
+		GrasasGCalc:        &gras,
+		Observacion:        req.Observacion,
+		State:              "A",
+	}
+	return a, s.repo.CreateAlimentoPlantilla(a)
+}
+
+func (s *NutricionService) GetAlimentosPlantillaDetalle(detalleID uint) ([]models.NutricionMenuAlimentoPlantilla, error) {
+	return s.repo.FindAlimentosByDetallePlantilla(detalleID)
+}
+
+func (s *NutricionService) UpdateAlimentoPlantillaDetalle(id uint, gramos float64) (*models.NutricionMenuAlimentoPlantilla, error) {
+	a, err := s.repo.FindAlimentoPlantillaByID(id)
+	if err != nil {
+		return nil, ErrAlimentoNotFound
+	}
+	alimento := a.Alimento
+	porcion := alimento.GramosPorcion
+	if porcion == 0 {
+		porcion = 100
+	}
+	ratio := gramos / porcion
+	cal := round2(alimento.Calorias * ratio)
+	prot := round2(alimento.ProteínasG * ratio)
+	carb := round2(alimento.CarbohidratosG * ratio)
+	gras := round2(alimento.GrasasG * ratio)
+	if err := s.repo.UpdateAlimentoPlantillaGramos(id, gramos, cal, prot, carb, gras); err != nil {
+		return nil, err
+	}
+	a.GramosAsignados = gramos
+	a.CaloriasCalc = &cal
+	a.ProteinasGCalc = &prot
+	a.CarbohidratosGCalc = &carb
+	a.GrasasGCalc = &gras
+	return a, nil
+}
+
+func (s *NutricionService) DeleteAlimentoPlantillaDetalle(id uint) error {
+	return s.repo.DeleteAlimentoPlantilla(id)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
