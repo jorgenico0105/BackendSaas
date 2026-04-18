@@ -264,6 +264,18 @@ func (h *NutricionHandler) UpdateDieta(c *gin.Context) {
 	responses.Success(c, "Dieta actualizada", d)
 }
 
+func (h *NutricionHandler) DeleteDieta(c *gin.Context) {
+	id, ok := paramUint(c, "dietaId")
+	if !ok {
+		return
+	}
+	if err := h.svc.DeleteDieta(id); err != nil {
+		responses.NotFound(c, "Dieta no encontrada")
+		return
+	}
+	responses.Success(c, "Dieta eliminada", nil)
+}
+
 // ─── Menús ────────────────────────────────────────────────────────────────────
 
 func (h *NutricionHandler) CreateMenu(c *gin.Context) {

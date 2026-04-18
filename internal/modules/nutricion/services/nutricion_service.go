@@ -247,6 +247,13 @@ func (s *NutricionService) CreateDieta(pacienteID, medicoID uint, req models.Cre
 	return d, nil
 }
 
+func (s *NutricionService) DeleteDieta(id uint) error {
+	if err := s.repo.DeleteDieta(id); err != nil {
+		return ErrDietaNotFound
+	}
+	return nil
+}
+
 func (s *NutricionService) UpdateDieta(id uint, req models.UpdateDietaRequest) (*models.NutricionDietaPaciente, error) {
 	d, err := s.repo.FindDietaByID(id)
 	if err != nil {
@@ -299,7 +306,7 @@ func (s *NutricionService) AssignMenuFromPlantilla(dietaID uint, req models.Assi
 	if err != nil {
 		fechaInicio = time.Now()
 	}
-	fechaFin := fechaInicio.AddDate(0, 0, 6)
+	fechaFin := fechaInicio.AddDate(0, 0, 7)
 	var firstErr error
 	var alimentos []*models.NutricionMenuAlimento
 	var detalles []*models.NutricionMenuDetalle

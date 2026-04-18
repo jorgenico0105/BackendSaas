@@ -91,6 +91,7 @@ func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMidd
 			pac.POST("/dietas", h.CreateDieta)
 			pac.GET("/dietas/:dietaId", h.GetDieta)
 			pac.PUT("/dietas/:dietaId", h.UpdateDieta)
+			pac.DELETE("/dietas/:dietaId", h.DeleteDieta)
 
 			// Menús semanales de una dieta
 			pac.GET("/dietas/:dietaId/menus", h.ListMenusByDieta)

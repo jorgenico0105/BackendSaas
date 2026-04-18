@@ -146,6 +146,12 @@ func (r *NutricionRepository) UpdateDieta(d *models.NutricionDietaPaciente) erro
 	return r.db.Save(d).Error
 }
 
+func (r *NutricionRepository) DeleteDieta(id uint) error {
+	return r.db.Model(&models.NutricionDietaPaciente{}).
+		Where("id = ? AND state = 'A'", id).
+		Update("state", "I").Error
+}
+
 func (r *NutricionRepository) CreateDetalle(d *models.NutricionMenuDetalle) error {
 	return r.db.Create(d).Error
 }
