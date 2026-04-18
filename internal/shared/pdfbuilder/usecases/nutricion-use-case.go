@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"fmt"
+	"math"
 	"saas-medico/internal/modules/nutricion/models"
 	"strconv"
 	"strings"
@@ -230,8 +231,17 @@ func getAlimetosContent(ca *ComidaAlimentos) []core.Row {
 	}
 
 	for _, alimento := range ca.Alimentos {
-		cantidad := alimento.Observacion
-		if cantidad == "" {
+		var cantidad string
+		if alimento.Observacion != "" {
+			cantidad = alimento.Observacion
+		} else if alimento.Alimento.NeedUnidad && alimento.Alimento.GramosUnidad != nil && *alimento.Alimento.GramosUnidad > 0 {
+			unidades := math.Ceil(alimento.GramosAsignados / *alimento.Alimento.GramosUnidad)
+			medida := alimento.Alimento.Medida
+			if medida == "" {
+				medida = "unidad(es)"
+			}
+			cantidad = fmt.Sprintf("%.0f %s", unidades, medida)
+		} else {
 			cantidad = fmt.Sprintf("%.0f gr", alimento.GramosAsignados)
 		}
 

@@ -47,14 +47,14 @@ internal/modules/
 Each module follows this structure:
 ```
 module_name/
-├── handlers/      # Parse request → call service → return response
-├── services/      # Business logic
-├── repositories/  # GORM data access
-├── models/        # GORM models + DTOs (separate files)
+├── handlers/      # One file: <module>_handler.go
+├── services/      # One file: <module>_service.go
+├── repositories/  # One file: <module>_repository.go
+├── models/        # GORM models + DTOs (separate files: <model>.go + dto.go)
 └── routes.go      # DI: repo→service→handler, route registration
 ```
 
-DI happens **inside `routes.go`** via `database.GetDB()`. No global service singletons.
+Each layer uses **one file per module** (not one file per entity). DI happens **inside `routes.go`** via `database.GetDB()`. No global service singletons.
 
 ### Startup order (`cmd/api/main.go`)
 
@@ -64,8 +64,8 @@ config.LoadConfig() → database.Connect() → redis.NewClient() → auth.Setup(
 
 - `auth.Setup()` must be called before `auth.GetAuthMiddleware()`.
 - `database.RunMigrations()` is **commented out** by default — uncomment only when needed, then re-comment.
-- Redis is **hardcoded** in `main.go` (`162.243.161.156:6379`, password `nico1234.`); `REDIS_ADDR` from `.env` is not used.
-- Server binds on `":" + port` (all interfaces), not localhost-only.
+- Redis is **hardcoded** in `main.go` (`127.0.0.1:6379`, password `nico1234.`); `REDIS_ADDR` from `.env` is not used.
+- Server binds on `127.0.0.1:<port>` (localhost only, behind Nginx); trusted proxies set to `127.0.0.1` and `::1`.
 
 ### RegisterRoutes signatures
 
@@ -99,7 +99,7 @@ RegisterRoutes(api, authMiddleware, rdb *redis.Client, openiaService *openia.Ope
 **Pacientes (mobile app):**
 - Separate JWT system with claims: `user_id` → `paciente_id`, `rol_name` → `"paciente"`, plus `clinica_id` and `aplicacion_id`.
 - Default password on creation: `Usuario123`.
-- See `NUTRICION_PACIENTE_CONTEXT.md` for patient-facing endpoints.
+- Patient-facing nutrition routes live under `/api/v1/paciente/nutricion/` in the nutricion module.
 
 ## Middleware
 
