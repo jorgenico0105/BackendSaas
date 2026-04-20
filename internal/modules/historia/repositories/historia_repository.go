@@ -197,7 +197,7 @@ func (r *HistoriaRepository) GetHistoriaClinicaByUser(userId, clinicaId, tipoFor
 
 func (r *HistoriaRepository) FindHistoriasByPaciente(pacienteID uint) ([]models.HistoriaClinica, error) {
 	var list []models.HistoriaClinica
-	err := r.db.Where("paciente_id = ? AND state = 'A'", pacienteID).
+	err := r.db.Preload("Respuestas").Where("paciente_id = ? AND state = 'A'", pacienteID).
 		Order("fecha DESC").Find(&list).Error
 	return list, err
 }
@@ -213,6 +213,7 @@ func (r *HistoriaRepository) FindHistoriasClinicasByPaciente(pacienteID uint) ([
 		hr.respuesta_numero AS respuesta_numero,
 		hc.id AS id_historia_clinica,
 		hc.fecha AS fecha_registro,
+		hc.observacion_general as observacion_general,
 		f.nombre AS nombre_formulario
 	`).
 		Joins("INNER JOIN formulario_preguntas fp ON fp.id = hr.pregunta_id").
