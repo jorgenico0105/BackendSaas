@@ -72,12 +72,13 @@ type CreateHistoriaRespuestaRequest struct {
 	RespuestaFecha  *string  `json:"respuesta_fecha" binding:"omitempty"`
 }
 type ResultadoHistoria struct {
-	Pregunta          string   `json:"pregunta"`
-	OrdenPregunta     int      `json:"orden_pregunta"`
-	Multiple          bool     `json:"multiple"`
-	RespuestaText     string   `json:"respuesta_text"`
-	RespuestaNumero   *float64 `json:"respuesta_numero"`
-	IDHistoriaClinica uint     `json:"id_historia_clinica"`
-	FechaRegistro     string   `json:"fecha_registro"`
-	NombreFormulario  string   `json:"nombre_formulario"`
+	Pregunta           string   `json:"pregunta"`
+	OrdenPregunta      int      `json:"orden_pregunta"`
+	Multiple           bool     `json:"multiple"`
+	RespuestaText      string   `json:"respuesta_text"`
+	RespuestaNumero    *float64 `json:"respuesta_numero"`
+	IDHistoriaClinica  uint     `json:"id_historia_clinica"`
+	FechaRegistro      string   `json:"fecha_registro"`
+	ObservacionGeneral string   `json:"observacion_general"`
+	NombreFormulario   string   `json:"nombre_formulario"`
 }
