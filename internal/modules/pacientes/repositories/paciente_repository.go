@@ -35,15 +35,12 @@ func (r *PacienteRepository) FindByID(id uint) (*models.Paciente, error) {
 	return &p, nil
 }
 
-func (r *PacienteRepository) FindAll(search string, page, pageSize int, clinicaId int, usuarioid int) ([]models.Paciente, int64, error) {
+func (r *PacienteRepository) FindAll(search string, page, pageSize int, clinicaId int) ([]models.Paciente, int64, error) {
 	var list []models.Paciente
 	var total int64
 	q := r.db.Model(&models.Paciente{}).Where("state = 'A'")
 	if clinicaId > 0 {
 		q = q.Where("clinica_id = ?", clinicaId)
-	}
-	if usuarioid > 0 {
-		q = q.Where("created_by = ?", usuarioid)
 	}
 	if search != "" {
 		like := "%" + search + "%"
@@ -53,7 +50,7 @@ func (r *PacienteRepository) FindAll(search string, page, pageSize int, clinicaI
 
 	q.Count(&total)
 	offset := (page - 1) * pageSize
-	err := q.Offset(offset).Limit(pageSize).Order("apellidos ASC").Find(&list).Error
+	err := q.Offset(offset).Limit(pageSize).Order("id DESC").Find(&list).Error
 	return list, total, err
 }
 

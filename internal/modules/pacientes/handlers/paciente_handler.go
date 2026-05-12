@@ -41,8 +41,7 @@ func (h *PacienteHandler) List(c *gin.Context) {
 	}
 
 	clinicaID := int(c.GetUint("clinicaID"))
-	userID := int(c.GetUint("userID"))
-	list, total, err := h.svc.List(search, page, size, clinicaID, userID)
+	list, total, err := h.svc.List(search, page, size, clinicaID)
 	if err != nil {
 		responses.InternalError(c, "Error al obtener pacientes")
 		return

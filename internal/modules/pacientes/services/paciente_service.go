@@ -63,8 +63,8 @@ func (s *PacienteService) GetByID(id uint) (*models.Paciente, error) {
 	return p, nil
 }
 
-func (s *PacienteService) List(search string, page, pageSize, clinicaId, usuarioId int) ([]models.Paciente, int64, error) {
-	return s.repo.FindAll(search, page, pageSize, clinicaId, usuarioId)
+func (s *PacienteService) List(search string, page, pageSize, clinicaId int) ([]models.Paciente, int64, error) {
+	return s.repo.FindAll(search, page, pageSize, clinicaId)
 }
 
 func (s *PacienteService) Update(id uint, req models.UpdatePacienteRequest) (*models.Paciente, error) {
