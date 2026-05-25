@@ -203,6 +203,7 @@ type NutricionMenuPlantillaSemana struct {
 	State         string                          `gorm:"type:char(1);default:'A';not null" json:"state"`
 	CreadoEn      time.Time                       `gorm:"autoCreateTime;column:creado_en" json:"creado_en"`
 	ActualizadoEn time.Time                       `gorm:"autoUpdateTime;column:actualizado_en" json:"actualizado_en"`
+	SexoMenu      string                          `gorm:"size:150" json:"sexo_menu,omitempty"`
 	Detalles      []NutricionMenuDetallePlantilla `gorm:"foreignKey:MenuID;references:ID" json:"detalles,omitempty"`
 }
 

@@ -110,7 +110,7 @@ func main() {
 // func main() {
 // 	config.LoadConfig()
 // 	database.Connect()
-// 	//database.RunMigrations()
+// 	database.RunMigrations()
 // 	rdb := redis.NewClient(&redis.Options{
 // 		Addr:     "162.243.161.156:6379",
 // 		Password: "nico1234.",

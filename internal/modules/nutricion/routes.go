@@ -61,6 +61,7 @@ func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMidd
 		n.GET("/plantillas-menu/:plantillaId", h.GetPlantillaSemana)
 		n.PUT("/plantillas-menu/:plantillaId", h.UpdatePlantillaSemana)
 		n.DELETE("/plantillas-menu/:plantillaId", h.DeletePlantillaSemana)
+		n.POST("/plantillas-menu/:plantillaId/duplicar", h.DuplicarPlantillaParaHombre)
 
 		// Detalles (día+comida) de una plantilla
 		n.GET("/plantillas-menu/:plantillaId/detalles", h.GetDetallesPlantilla)

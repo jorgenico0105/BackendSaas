@@ -282,7 +282,21 @@ func (r *NutricionRepository) CreateMenuDetalles(comidas []*models.NutricionMenu
 	return comidas, nil
 }
 
+func (r *NutricionRepository) CreateMenuDetallesPlatilla(comidas []*models.NutricionMenuDetallePlantilla) ([]*models.NutricionMenuDetallePlantilla, error) {
+	err := r.db.CreateInBatches(comidas, 100).Error
+	if err != nil {
+		return nil, err
+	}
+	return comidas, nil
+}
 func (r *NutricionRepository) AddAlimentosToComidas(alimentos []*models.NutricionMenuAlimento) ([]*models.NutricionMenuAlimento, error) {
+	err := r.db.CreateInBatches(alimentos, 100).Error
+	if err != nil {
+		return nil, err
+	}
+	return alimentos, nil
+}
+func (r *NutricionRepository) AddAlimentosToPlantillas(alimentos []*models.NutricionMenuAlimentoPlantilla) ([]*models.NutricionMenuAlimentoPlantilla, error) {
 	err := r.db.CreateInBatches(alimentos, 100).Error
 	if err != nil {
 		return nil, err

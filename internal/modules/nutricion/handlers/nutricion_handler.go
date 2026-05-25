@@ -1130,6 +1130,19 @@ func (h *NutricionHandler) DeletePlantillaSemana(c *gin.Context) {
 	responses.Success(c, "Plantilla de menú eliminada", nil)
 }
 
+func (h *NutricionHandler) DuplicarPlantillaParaHombre(c *gin.Context) {
+	id, ok := paramUint(c, "plantillaId")
+	if !ok {
+		return
+	}
+	p, err := h.svc.DuplicarPlantillaParaHombre(id)
+	if err != nil {
+		responses.InternalError(c, "Error al duplicar la plantilla")
+		return
+	}
+	responses.Created(c, "Plantilla duplicada para hombre", p)
+}
+
 func (h *NutricionHandler) AddDetallePlantilla(c *gin.Context) {
 	plantillaID, ok := paramUint(c, "plantillaId")
 	if !ok {

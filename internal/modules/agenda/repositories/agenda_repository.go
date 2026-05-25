@@ -48,7 +48,7 @@ func (r *AgendaRepository) FindCitas(medicoID, clinicaID uint, fecha *time.Time,
 	q.Count(&total)
 	offset := (page - 1) * pageSize
 	err := q.Preload("TipoCita").Preload("EstadoCita").Preload("Paciente").Preload("PrePaciente").
-		Offset(offset).Limit(pageSize).Order("fecha ASC, hora ASC").Find(&list).Error
+		Offset(offset).Limit(pageSize).Order("fecha DESC, hora DESC").Find(&list).Error
 	return list, total, err
 }
 

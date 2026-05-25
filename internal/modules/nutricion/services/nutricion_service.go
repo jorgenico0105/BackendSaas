@@ -1962,6 +1962,107 @@ func (s *NutricionService) DeletePlantillaSemana(id uint) error {
 	return s.repo.DeletePlantillaSemana(id)
 }
 
+func (s *NutricionService) DuplicarPlantillaParaHombre(id uint) (*models.NutricionMenuPlantillaSemana, error) {
+	var original *models.NutricionMenuPlantillaSemana
+	var detalles []*models.NutricionMenuDetallePlantilla
+
+	original, _ = s.repo.FindPlantillaSemanaByID(id)
+
+	nueva := models.NutricionMenuPlantillaSemana{
+		ClinicaID:    original.ClinicaID,
+		MedicoID:     original.MedicoID,
+		SemanaNumero: original.SemanaNumero,
+		NumComidas:   original.NumComidas,
+		Nombre:       original.Nombre + " (Hombre)",
+		Notas:        original.Notas,
+		State:        "A",
+		SexoMenu:     "M",
+	}
+	err := s.repo.CreatePlantillaSemana(&nueva)
+	if err != nil {
+		return nil, err
+	}
+	const factor = 1.3
+	for _, det := range original.Detalles {
+		nuevoDetalle := models.NutricionMenuDetallePlantilla{
+			MenuID:              nueva.ID,
+			TipoComidaID:        det.TipoComidaID,
+			DiaNúmero:           det.DiaNúmero,
+			NombreComida:        det.NombreComida,
+			Instrucciones:       det.Instrucciones,
+			NombreReceta:        det.NombreReceta,
+			CaloriasTotal:       multPtrFloat64(det.CaloriasTotal, factor),
+			ProteinasGTotal:     multPtrFloat64(det.ProteinasGTotal, factor),
+			CarbohidratosGTotal: multPtrFloat64(det.CarbohidratosGTotal, factor),
+			GrasasGTotal:        multPtrFloat64(det.GrasasGTotal, factor),
+			State:               "A",
+		}
+		detalles = append(detalles, &nuevoDetalle)
+	}
+	details, err := s.repo.CreateMenuDetallesPlantilla(detalles)
+	if err != nil {
+		return nil, err
+	}
+	mapId := make(map[string]uint)
+	for _, detail := range details {
+		key := fmt.Sprintf("%d_%d", detail.DiaNúmero, detail.TipoComidaID)
+		mapId[key] = detail.ID
+	}
+	for _, det := range original.Detalles {
+		key := fmt.Sprintf("%d_%d", det.DiaNúmero, det.TipoComidaID)
+		var detAlimentos []*models.NutricionMenuAlimentoPlantilla
+		for _, alim := range det.Alimentos {
+			newGramos := alim.GramosAsignados * factor
+			var newCal, newProt, newCarb, newGras *float64
+			if alim.CaloriasCalc != nil {
+				v := *alim.CaloriasCalc * factor
+				newCal = &v
+			}
+			if alim.ProteinasGCalc != nil {
+				v := *alim.ProteinasGCalc * factor
+				newProt = &v
+			}
+			if alim.CarbohidratosGCalc != nil {
+				v := *alim.CarbohidratosGCalc * factor
+				newCarb = &v
+			}
+			if alim.GrasasGCalc != nil {
+				v := *alim.GrasasGCalc * factor
+				newGras = &v
+			}
+			detAlimentos = append(detAlimentos, &models.NutricionMenuAlimentoPlantilla{
+				MenuDetalleID:      mapId[key],
+				AlimentoID:         alim.AlimentoID,
+				GramosAsignados:    newGramos,
+				CaloriasCalc:       newCal,
+				ProteinasGCalc:     newProt,
+				CarbohidratosGCalc: newCarb,
+				GrasasGCalc:        newGras,
+				Observacion:        alim.Observacion,
+				State:              "A",
+			})
+		}
+		if len(detAlimentos) > 0 {
+			_, err = s.repo.AddAlimentosToPlantillaComidas(detAlimentos)
+			if err != nil {
+				log.Println(err)
+				return nil, err
+			}
+		}
+	}
+	n, _ := s.repo.FindPlantillaSemanaByID(nueva.ID)
+	return n, nil
+}
+
+func multPtrFloat64(v *float64, factor float64) *float64 {
+	if v == nil {
+		return nil
+	}
+
+	result := *v * factor
+	return &result
+}
+
 func (s *NutricionService) AddDetallePlantilla(plantillaID uint, req models.AddDetallePlantillaRequest) (*models.NutricionMenuDetallePlantilla, error) {
 	d := &models.NutricionMenuDetallePlantilla{
 		MenuID:        plantillaID,
