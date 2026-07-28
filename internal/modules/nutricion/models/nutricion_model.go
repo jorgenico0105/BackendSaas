@@ -856,11 +856,12 @@ type AddAlimentoPlantillaRequest struct {
 
 // AssignMenuFromPlantillaRequest — frontend manda la plantilla completa (con cantidades ajustadas)
 type AssignMenuFromPlantillaRequest struct {
-	SemanaNumero int                     `json:"semana_numero" binding:"required,min=1"`
-	FechaInicio  string                  `json:"fecha_inicio" binding:"required"`
-	Nombre       string                  `json:"nombre"`
-	Notas        string                  `json:"notas"`
-	Detalles     []PlantillaDetalleInput `json:"detalles"`
+	SemanaNumero    int                     `json:"semana_numero" binding:"required,min=1"`
+	FechaInicio     string                  `json:"fecha_inicio" binding:"required"`
+	DuracionSemanas int                     `json:"duracion_semanas"` // 0 ó 1 = 1 semana (default)
+	Nombre          string                  `json:"nombre"`
+	Notas           string                  `json:"notas"`
+	Detalles        []PlantillaDetalleInput `json:"detalles"`
 }
 
 type PlantillaDetalleInput struct {

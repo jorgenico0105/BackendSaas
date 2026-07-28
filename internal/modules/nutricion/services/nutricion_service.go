@@ -306,7 +306,11 @@ func (s *NutricionService) AssignMenuFromPlantilla(dietaID uint, req models.Assi
 	if err != nil {
 		fechaInicio = time.Now()
 	}
-	fechaFin := fechaInicio.AddDate(0, 0, 7)
+	semanas := req.DuracionSemanas
+	if semanas <= 0 {
+		semanas = 1
+	}
+	fechaFin := fechaInicio.AddDate(0, 0, semanas*7)
 	var firstErr error
 	var alimentos []*models.NutricionMenuAlimento
 	var detalles []*models.NutricionMenuDetalle
@@ -321,6 +325,14 @@ func (s *NutricionService) AssignMenuFromPlantilla(dietaID uint, req models.Assi
 		}
 	}
 
+	// El primer menú de la dieta se activa automáticamente; los siguientes quedan PENDIENTE
+	// hasta que el nutricionista los active manualmente.
+	estadoInicial := models.EstadoMenuPendiente
+	existentes, _ := s.repo.FindMenusByDieta(dietaID)
+	if len(existentes) == 0 {
+		estadoInicial = models.EstadoMenuActivo
+	}
+
 	menu := &models.NutricionMenu{
 		DietaPacienteID: dietaID,
 		SemanaNumero:    req.SemanaNumero,
@@ -328,7 +340,7 @@ func (s *NutricionService) AssignMenuFromPlantilla(dietaID uint, req models.Assi
 		Notas:           req.Notas,
 		FechaInicio:     fechaInicio,
 		FechaFin:        fechaFin,
-		Estado:          "ACTIVO",
+		Estado:          estadoInicial,
 		State:           "A",
 	}
 
@@ -1147,6 +1159,15 @@ func (s *NutricionService) addAlimentosToPlantillaComidas(
 
 func (s *NutricionService) ListMenusByDieta(dietaID uint) ([]models.NutricionMenu, error) {
 	return s.repo.FindMenusByDieta(dietaID)
+}
+
+// ActivarMenu pone el menú indicado en ACTIVO y todos los demás de la dieta en PENDIENTE.
+func (s *NutricionService) ActivarMenu(menuID uint) error {
+	m, err := s.repo.FindMenuByID(menuID)
+	if err != nil {
+		return ErrMenuNotFound
+	}
+	return s.repo.ActivarMenu(menuID, m.DietaPacienteID)
 }
 
 func (s *NutricionService) GetMenu(id uint) (*models.NutricionMenu, error) {

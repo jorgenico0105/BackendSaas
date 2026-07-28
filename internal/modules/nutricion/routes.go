@@ -98,6 +98,7 @@ func RegisterRoutes(router *gin.RouterGroup, authMiddleware *middleware.AuthMidd
 			pac.GET("/dietas/:dietaId/menus", h.ListMenusByDieta)
 			pac.POST("/dietas/:dietaId/menus", h.CreateMenu)
 			pac.GET("/menus/:menuId", h.GetMenu)
+			pac.PATCH("/menus/:menuId/activar", h.ActivarMenu)
 			pac.GET("/menus/:menuId/detalles", h.GetDetallesMenu)
 			pac.POST("/menus/:menuId/detalles", h.AddDetalleMenu)
 

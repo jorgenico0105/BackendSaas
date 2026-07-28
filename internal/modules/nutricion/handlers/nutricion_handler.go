@@ -358,6 +358,18 @@ func (h *NutricionHandler) GetMenu(c *gin.Context) {
 	responses.Success(c, "Menú", m)
 }
 
+func (h *NutricionHandler) ActivarMenu(c *gin.Context) {
+	menuID, ok := paramUint(c, "menuId")
+	if !ok {
+		return
+	}
+	if err := h.svc.ActivarMenu(menuID); err != nil {
+		responses.NotFound(c, "Menú no encontrado")
+		return
+	}
+	responses.Success(c, "Menú activado", nil)
+}
+
 func (h *NutricionHandler) GetDetallesMenu(c *gin.Context) {
 	menuID, ok := paramUint(c, "menuId")
 	if !ok {

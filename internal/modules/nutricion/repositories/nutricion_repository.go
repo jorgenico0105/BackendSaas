@@ -246,6 +246,20 @@ func (r *NutricionRepository) UpdateMenu(m *models.NutricionMenu) error {
 	return r.db.Save(m).Error
 }
 
+// ActivarMenu pone este menú en ACTIVO y todos los demás de la misma dieta en PENDIENTE.
+func (r *NutricionRepository) ActivarMenu(menuID, dietaPacienteID uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.NutricionMenu{}).
+			Where("dieta_paciente_id = ? AND state = 'A'", dietaPacienteID).
+			Update("estado", models.EstadoMenuPendiente).Error; err != nil {
+			return err
+		}
+		return tx.Model(&models.NutricionMenu{}).
+			Where("id = ? AND state = 'A'", menuID).
+			Update("estado", models.EstadoMenuActivo).Error
+	})
+}
+
 func (r *NutricionRepository) FindMenusRequierenCambio() ([]models.NutricionMenu, error) {
 	var list []models.NutricionMenu
 	err := r.db.
