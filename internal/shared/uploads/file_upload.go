@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	MaxFileSize     = 10 << 20 // 10 MB
+	MaxFileSize     = 40 << 20 // 10 MB
 	UploadDirectory = "storage/uploads"
 )
 
